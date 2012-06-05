@@ -1,0 +1,14 @@
+Source: python-riakasaurus
+Section: net
+Priority: optional
+Maintainer: Colin Alston <colin.alston@gmail.com>
+Build-Depends: debhelper (>= 7.0.50~), python-support
+Standards-Version: 3.9.1
+
+Package: python-riakasaurus
+Architecture: all
+Depends: ${python:Depends},
+    ${misc:Depends},
+    python-twisted
+Description: Twisted Riak client
+ Twisted Riak client

@@ -1,0 +1,6 @@
+python-txriak (0.3.4) unstable; urgency=low
+
+  * Initial packaging
+
+ -- Colin Alston <colin.alston@gmail.com>  Sat, 5 Jun 2012 14:32:52 +0200
+
