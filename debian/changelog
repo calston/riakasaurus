@@ -1,4 +1,4 @@
-python-riakasaurus (1.0.0-0ubuntu3) lucid; urgency=low
+python-riakasaurus (1.0.1-0ubuntu3) lucid; urgency=low
 
   * Dumping SSL support
   * Fixing build dependencies
