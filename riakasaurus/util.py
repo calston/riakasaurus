@@ -19,11 +19,14 @@ from StringIO import StringIO
 
 DEBUG=False
 
-from twisted.internet.ssl import ClientContextFactory
+# XXX pyOpenSSL is basically fucked in a whole host of distro's
+#     thanks to SSLv2 being summarily removed from libssl. 
+#     For the time being, to hell with SSL, it breaks everywhere
+#from twisted.internet.ssl import ClientContextFactory
 
-class WebClientContextFactory(ClientContextFactory):
-    def getContext(self, hostname, port):
-        return ClientContextFactory.getContext(self)
+#class WebClientContextFactory(ClientContextFactory):
+#    def getContext(self, hostname, port):
+#        return ClientContextFactory.getContext(self)
 
 
 class Agent(client.Agent):
@@ -33,7 +36,7 @@ class Agent(client.Agent):
     """
 
     def __init__(self, reactor,
-                       contextFactory=WebClientContextFactory(),
+                       contextFactory=None,
                        timeout=240):
         self._reactor = reactor
         self._contextFactory = contextFactory
@@ -47,8 +50,9 @@ class Agent(client.Agent):
         if scheme == 'http':
             d = cc.connectTCP(host, port, timeout=self.timeout)
         elif scheme == 'https':
-            d = cc.connectSSL(host, port, self._wrapContextFactory(host, port),
-                              timeout=self.timeout)
+            raise Exception('HTTPS not supported') 
+            #d = cc.connectSSL(host, port, self._wrapContextFactory(host, port),
+            #                  timeout=self.timeout)
         else:
             d = defer.fail(SchemeNotSupported(
                     "Unsupported scheme: %r" % (scheme,)))
