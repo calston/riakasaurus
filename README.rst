@@ -44,8 +44,9 @@ Riakasaurus uses inline deferreds, any operation that requires connecting to Ria
 
     reactor.run()
 
+
 Contributors 
----
+-----
 
 Thank you to these people for their previous contributions to txriak and Riakasaurus 
 
