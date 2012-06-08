@@ -9,6 +9,8 @@ Package: python-riakasaurus
 Architecture: all
 Depends: ${python:Depends},
     ${misc:Depends},
-    python-twisted
+    python-twisted, 
+    python-crypto, 
+    python-openssl
 Description: Twisted Riak client
  Twisted Riak client

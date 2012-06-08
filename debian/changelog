@@ -1,12 +1,12 @@
-python-riakasaurus (0.3.4) unstable; urgency=low
-
-  * Initial packaging
-
- -- Colin Alston <colin.alston@gmail.com>  Tue, 5 Jun 2012 14:32:52 +0200
-
 python-riakasaurus (1.0.0-1000) unstable; urgency=low
 
   * Moving version number forward
 
  -- Colin Alston <colin.alston@gmail.com>  Wed, 6 Jun 2012 10:55:00 +0200
+
+python-riakasaurus (0.3.4) unstable; urgency=low
+
+  * Initial packaging
+
+ -- Colin Alston <colin.alston@gmail.com>  Tue, 5 Jun 2012 14:32:52 +0200
 
