@@ -1,3 +1,9 @@
+python-riakasaurus (1.0.0-1001) unstable; urgency=low
+
+  * Fixing dependencies
+
+ -- Colin Alston <colin.alston@gmail.com>  Wed, 6 Jun 2012 11:57:00 +0200
+
 python-riakasaurus (1.0.0-1000) unstable; urgency=low
 
   * Moving version number forward
