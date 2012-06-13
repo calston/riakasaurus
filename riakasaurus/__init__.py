@@ -8,7 +8,7 @@ Modules based on code originally disbributed by Basho:
     and 
     https://bitbucket.org/asi/txriak/overview
 """
-VERSION = '1.0.0'
+VERSION = '1.0.1'
 
 LICENSE = """
 %s
