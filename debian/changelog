@@ -1,16 +1,17 @@
-python-riakasaurus (1.0.0-1001) unstable; urgency=low
+python-riakasaurus (1.0.1-0ubuntu3) lucid; urgency=low
 
   * Dumping SSL support
+  * Fixing build dependencies
 
- -- Colin Alston <colin.alston@gmail.com>  Wed, 6 Jun 2012 11:57:00 +0200
+ -- Colin Alston <colin.alston@gmail.com>  Fri, 08 Jun 2012 15:48:41 +0200
 
-python-riakasaurus (1.0.0-1000) unstable; urgency=low
+python-riakasaurus (1.0.0-1000) lucid; urgency=low
 
   * Moving version number forward
 
  -- Colin Alston <colin.alston@gmail.com>  Wed, 6 Jun 2012 10:55:00 +0200
 
-python-riakasaurus (0.3.4) unstable; urgency=low
+python-riakasaurus (0.3.4) lucid; urgency=low
 
   * Initial packaging
 
