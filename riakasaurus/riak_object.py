@@ -410,7 +410,7 @@ class RiakObject(object):
         not the Riak stored version.
         :returns: self
         """
-        self._headers = []
+        self._headers = {}
         self._links = []
         self._data = None
         self._metas = {}
