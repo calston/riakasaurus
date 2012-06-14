@@ -6,6 +6,7 @@
 import re
 import json
 import csv
+import urllib
 from twisted.internet import defer
 
 from riakasaurus import util, mapreduce, riak_link, riak_index_entry
@@ -536,8 +537,9 @@ class RiakObject(object):
                  "\<\/([^\/]+)\/([^\/]+)\/([^\/]+)\>; ?riaktag=\"([^\']+)\"",
                  link_header)
             if (matches != None):
-                link = riak_link.RiakLink(matches.group(2), matches.group(3),
-                                matches.group(4))
+                link = riak_link.RiakLink(urllib.unquote_plus(matches.group(2)),
+                                          urllib.unquote_plus(matches.group(3)),
+                                          urllib.unquote_plus(matches.group(4)))
                 self._links.append(link)
 
         return self

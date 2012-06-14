@@ -517,10 +517,12 @@ class RiakTestCase1(unittest.TestCase):
         # so there's now something wrong with link storage.
         log.msg('*** store_and_get_links')
 
+        quote_string = "tag2!@#%^&*)"
+
         obj = self.bucket.new("foo", 2) \
                 .add_link(self.bucket.new("foo1")) \
                 .add_link(self.bucket.new("foo2"), "tag") \
-                .add_link(self.bucket.new("foo3"), "tag2!@#%^&*)")
+                .add_link(self.bucket.new(quote_string), quote_string)
         yield obj.store()
         del obj
 
@@ -528,6 +530,11 @@ class RiakTestCase1(unittest.TestCase):
         obj = yield self.bucket.get("foo")
         links = obj.get_links()
         self.assertEqual(len(links), 3)
+
+        quote_link = links[-1]
+        self.assertEqual(quote_link.get_key(), quote_string)
+        self.assertEqual(quote_link.get_tag(), quote_string)
+
         log.msg('done store_and_get_links')
 
     @defer.inlineCallbacks
