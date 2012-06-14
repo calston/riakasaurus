@@ -51,6 +51,6 @@ Contributors
 Thank you to these people for their previous contributions to txriak and Riakasaurus 
 
  * Simon Cross - Solr search and restructuring many things 
- * tobixx (https://github.com/tobixx) - returnbody changes
+ * Steffen Oschatz (https://github.com/tobixx) - Various patches
  * Jason J. W. Williams 
  * Appropriate Solutions - For the origional txriak work
