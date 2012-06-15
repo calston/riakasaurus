@@ -4,7 +4,6 @@
 """
 
 import re
-import json
 import csv
 import urllib
 from twisted.internet import defer
@@ -304,8 +303,9 @@ class RiakObject(object):
                                                     self._key, None, params)
 
         # Construct the headers...
+        content_type = self.get_content_type()
         headers = {'Accept': 'text/plain, */*; q=0.5',
-                   'Content-Type': self.get_content_type(),
+                   'Content-Type': content_type,
                    'X-Riak-ClientId': self._client.get_client_id()}
 
         # Add the vclock if it exists...
@@ -333,7 +333,8 @@ class RiakObject(object):
             headers['Link'] += link._to_link_header(self._client)
 
         if (self._jsonize):
-            content = json.dumps(self.get_data())
+            encoder = self._client.get_encoder(content_type)
+            content = encoder(self.get_data())
         else:
             content = self.get_data()
 
@@ -507,7 +508,9 @@ class RiakObject(object):
 
         # Possibly json_decode...
         if (status == 200 and self._jsonize):
-            self._data = json.loads(self._data)
+            content_type = self.get_content_type()
+            decoder = self._client.get_decoder(content_type)
+            self._data = decoder(self._data)
 
         return self
 
