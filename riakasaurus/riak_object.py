@@ -103,7 +103,7 @@ class RiakObject(object):
         @return string
         .. todo:: convert to property
         """
-        return self._headers['content-type']
+        return self._headers.get('content-type', 'text/json')
 
     def set_content_type(self, content_type):
         """
@@ -418,6 +418,7 @@ class RiakObject(object):
         self._metas = {}
         self._exists = False
         self._siblings = []
+        self._indexes = []
         return self
 
     def vclock(self):
