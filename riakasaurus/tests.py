@@ -85,6 +85,23 @@ class RiakTestCase1(unittest.TestCase):
         log.msg("done secondary_index")
 
     @defer.inlineCallbacks
+    def test_set_data_empty(self):
+        """Get an object that does not exist, then set_data and save it """
+        log.msg("*** set_data_empty")
+
+        obj = yield self.bucket.get("foo1") 
+
+        self.assertEqual(obj.exists(), False)
+        self.assertEqual(obj.get_data(), None)
+
+        obj.set_data('bar1')
+        yield obj.store()
+
+        self.assertEqual(obj.exists(), True)
+        self.assertEqual(obj.get_data(), "bar1")
+        log.msg("done set_data_empty")
+
+    @defer.inlineCallbacks
     def test_add_and_delete(self):
         """Basic adds and deletes"""
         log.msg("*** add_and_delete")
