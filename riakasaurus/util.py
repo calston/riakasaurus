@@ -9,6 +9,7 @@ import codecs
 from twisted.internet import defer
 from twisted.internet import reactor
 from zope.interface import implements
+from twisted import version as twisted_version
 from twisted.web import client
 from twisted.web.http import PotentialDataLoss
 from twisted.web.http_headers import Headers
@@ -29,34 +30,39 @@ DEBUG=False
 #        return ClientContextFactory.getContext(self)
 
 
-class Agent(client.Agent):
-    """
-    client.Agent does not provide the ability to set a timeout.
-    This is an Agent with a timeout.
-    """
+# From Twisted 11.1, Agent accepts a `connectTimeout` parameter.
+# From Twisted 12.1, Agent works differently and the subclass below breaks.
+if twisted_version.major >= 12:
+    Agent = client.Agent
+else:
+    class Agent(client.Agent):
+        """
+        client.Agent does not provide the ability to set a timeout.
+        This is an Agent with a timeout.
+        """
 
-    def __init__(self, reactor,
-                       contextFactory=None,
-                       timeout=240):
-        self._reactor = reactor
-        self._contextFactory = contextFactory
-        self.timeout = timeout
+        def __init__(self, reactor,
+                           contextFactory=None,
+                           connectTimeout=240):
+            self._reactor = reactor
+            self._contextFactory = contextFactory
+            self.connectTimeout = connectTimeout
 
 
-    def _connect(self, scheme, host, port):
-        """ connect method with a timeout. """
+        def _connect(self, scheme, host, port):
+            """ connect method with a timeout. """
 
-        cc = client.ClientCreator(self._reactor, self._protocol)
-        if scheme == 'http':
-            d = cc.connectTCP(host, port, timeout=self.timeout)
-        elif scheme == 'https':
-            raise Exception('HTTPS not supported') 
-            #d = cc.connectSSL(host, port, self._wrapContextFactory(host, port),
-            #                  timeout=self.timeout)
-        else:
-            d = defer.fail(SchemeNotSupported(
-                    "Unsupported scheme: %r" % (scheme,)))
-        return d
+            cc = client.ClientCreator(self._reactor, self._protocol)
+            if scheme == 'http':
+                d = cc.connectTCP(host, port, timeout=self.connectTimeout)
+            elif scheme == 'https':
+                raise Exception('HTTPS not supported')
+                #d = cc.connectSSL(host, port, self._wrapContextFactory(host, port),
+                #                  timeout=self.timeout)
+            else:
+                d = defer.fail(SchemeNotSupported(
+                        "Unsupported scheme: %r" % (scheme,)))
+            return d
 
 class StringProducer(object):
     """
@@ -149,7 +155,7 @@ def getPageWithHeaders(contextFactory=None,
     else:
         body = None
 
-    d = Agent(reactor, timeout=timeout).request(kwargs["method"],
+    d = Agent(reactor, connectTimeout=timeout).request(kwargs["method"],
                                       url,
                                       Headers(kwargs["headers"]),
                                       body
