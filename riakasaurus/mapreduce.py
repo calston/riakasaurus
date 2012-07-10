@@ -255,8 +255,9 @@ class RiakMapReduce(object):
         host = self._client._host
         port = self._client._port
         url = "/" + self._client._mapred_prefix
+        headers = {"Content-Type": "application/json"}
         response = yield util.http_request_deferred('POST', host, port,
-                                                          url, {}, content)
+                                                    url, headers, content)
         if response[0]["http_code"] > 299:
             raise Exception("Error running map/reduce job. Error: " +
                             response[1])
