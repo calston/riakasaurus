@@ -5,10 +5,8 @@ Basho Technologies, Inc. http://basho.com/
 
 Modules based on code originally disbributed by Basho:
     http://riak.basho.com/python_client_api/riak.html
-    and 
-    https://bitbucket.org/asi/txriak/overview
 """
-VERSION = '1.0.2'
+VERSION = '1.0.4'
 
 LICENSE = """
 %s
