@@ -316,37 +316,14 @@ class RiakBucket(object):
         props = props['props']
         defer.returnValue(props)
 
-    @defer.inlineCallbacks
     def list_keys(self):
         """
         Retrieve a list of all bucket keys.
 
         :returns: list -- via deferred
         """
-        # Create the request
-        params = {"keys": "stream", "props": "false"}
 
-        host, port, url = util.build_rest_path(self._client,
-                                                    self,
-                                                    None,
-                                                    None,
-                                                    params)
-        raw_response = yield util.http_request_deferred('GET', host,
-                                                             port, url)
-
-        if raw_response[0]["http_code"] != 200:
-            raise Exception('Error listing keys in bucket %s.' % self._name)
-
-        # Hacky method to deal with the concatenated response
-        # we get due to the chunked encoding method.
-        parts = raw_response[1].split('{"keys":[')
-        keys = []
-
-        for part in parts[1:]:
-            temp_keys = json.loads('{"keys":[' + part)["keys"]
-            keys = keys + temp_keys
-
-        defer.returnValue([urllib.unquote(x) for x in keys])
+        return self._client.transport.get_keys(self)
 
     def get_keys(self):
         return self.list_keys()
