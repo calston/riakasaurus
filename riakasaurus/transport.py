@@ -1,6 +1,9 @@
+from zope.interface import implements
+
 from twisted.internet import defer, reactor, protocol
 from twisted.web.client import Agent
 from twisted.web.http_headers import Headers
+from twisted.web.iweb import IBodyProducer
 
 import urllib
 import re, csv
@@ -22,6 +25,26 @@ class BodyReceiver(protocol.Protocol):
         self.buffer.seek(0)
         self.finished.callback(self.buffer)
 
+class StringProducer(object):
+    """
+    Body producer for t.w.c.Agent
+    """
+    implements(IBodyProducer)
+
+    def __init__(self, body):
+        self.body = body
+        self.length = len(body)
+
+    def startProducing(self, consumer):
+        consumer.write(self.body)
+        return defer.succeed(None)
+
+    def pauseProducing(self):
+        pass
+
+    def stopProducing(self):
+        pass
+
 class HTTPTransport(object):
     """ HTTP Transport for Riak """
     def __init__(self, client):
@@ -32,7 +55,6 @@ class HTTPTransport(object):
 
     def http_response(self, response):
         def haveBody(body):
-
             headers = {"http_code": response.code}
             for key, val in response.headers.getAllRawHeaders():
                 headers[key.lower()] = val[0]
@@ -46,14 +68,25 @@ class HTTPTransport(object):
         else:
             return haveBody(StringIO(""))
 
-    def http_request(self, method, path, headers=None, body=None):
+    def http_request(self, method, path, headers={}, body=None):
         url = "http://%s:%s%s" % (self.host, self.port, path)
 
-        if headers:
-            headers = Headers(headers)
+        h = {}
+        for k, v in headers.items():
+            if not isinstance(v, list):
+                h[k] = [v]
+            else:
+                h[k] = v 
+
+        print repr(url), repr(h), repr(body)
+
+        if body:
+            bodyProducer = StringProducer(body)
+        else:
+            bodyProducer = None
 
         return Agent(reactor).request(
-                method, url, headers, body
+                method, url, Headers(h), bodyProducer
             ).addCallback(self.http_response)
 
     def build_rest_path(self, bucket=None, key=None, params=None, prefix=None) :
@@ -110,18 +143,16 @@ class HTTPTransport(object):
     def set_bucket_props(self, bucket, props):
         """
         Set bucket properties
-        returns a deferred
         """ 
-
-        host, port, url = util.build_rest_path(bucket)
+        url = self.build_rest_path(bucket)
         headers = {'Content-Type': 'application/json'}
-        content = json.dumps({'props': props})
+        content = self.encodeJson({'props': props})
 
         #Run the request...
         headers, response = yield self.http_request('PUT', url, headers, content)
 
         # Handle the response...
-        if (response == None):
+        if (response is None):
             raise Exception('Error setting bucket properties.')
 
         # Check the response value...
@@ -129,6 +160,7 @@ class HTTPTransport(object):
 
         if (status != 204):
             raise Exception('Error setting bucket properties.')
+
         defer.returnValue(response)
 
     def set_client_id(self, client_id):
@@ -138,7 +170,7 @@ class HTTPTransport(object):
         return self._client_id
 
     @defer.inlineCallbacks
-    def ping(self) :
+    def ping(self):
         """
         Check server is alive over HTTP
         """
@@ -322,7 +354,7 @@ class HTTPTransport(object):
         content = self.encodeJson(job)
 
         # Do the request...
-        url = "/" + self._mapred_prefix
+        url = "/" + self.client._mapred_prefix
         headers = {'Content-Type': 'application/json'}
         response = yield self.http_request('POST', url, headers, content)
 

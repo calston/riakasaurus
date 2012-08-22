@@ -24,7 +24,7 @@ class RiakClient(object):
     """
     def __init__(self, host='127.0.0.1', port=8098,
                 prefix='riak', mapred_prefix='mapred',
-                client_id=None, r_value=2, w_value=2, dw_value=0, 
+                client_id=None, r_value="default", w_value="default", dw_value="default",
                 transport=transport.HTTPTransport):
         """
         Construct a new RiakClient object.
@@ -43,6 +43,11 @@ class RiakClient(object):
         self._r = r_value
         self._w = w_value
         self._dw = dw_value
+
+        self._rw = "default"
+        self._pr = "default"
+        self._pw = "default"
+
         self._encoders = {'application/json': json.dumps,
                           'text/json': json.dumps}
         self._decoders = {'application/json': json.loads,
@@ -58,6 +63,14 @@ class RiakClient(object):
         .. todo:: remove accessor
         """
         return self._r
+
+    def get_pw(self):
+        """
+        Get the PW-value setting for this ``RiakClient``. (default 0)
+
+        :rtype: integer
+        """
+        return self._pw
 
     def set_r(self, r):
         """
@@ -177,9 +190,8 @@ class RiakClient(object):
         Check if the Riak server for this RiakClient is alive.
         :returns: True if alive -- via deferred.
         """
-        response = yield util.http_request_deferred('GET', self._host,
-                                          self._port, '/ping')
-        defer.returnValue((response != None) and (response[1] == 'OK'))
+
+        return self._client.transport.ping()
 
     def set_mapreduce(self, mreduce):
         """
@@ -215,31 +227,14 @@ class RiakClient(object):
         mr = mapreduce.RiakMapReduce(self)
         return apply(mr.link, args)
 
-    @defer.inlineCallbacks
     def list_buckets(self):
         """
         Retrieve a list of all buckets.
 
         :returns: list -- via deferred
         """
-        # Create the request
-        params = {"buckets": "true"}
 
-        host, port, url = util.build_rest_path(self,
-                                                    None,
-                                                    None,
-                                                    None,
-                                                    params)
-        raw_response = yield util.http_request_deferred('GET', host,
-                                                             port, url)
-
-        if raw_response[0]["http_code"] != 200:
-            raise Exception('Error listing buckets.')
-
-        # Parse the bucket list
-        buckets = json.loads(raw_response[1])["buckets"]
-
-        defer.returnValue([urllib.unquote(x) for x in buckets])
+        return self._client.transport.get_buckets()
 
     def index(self, *args):
         """

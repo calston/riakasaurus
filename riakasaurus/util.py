@@ -1,6 +1,8 @@
 """
 .. module:: util.py
 
+--- NOTE: All of this is pretty much deprecated by the transport.HTTPTransport object
+
 """
 
 import urllib
@@ -18,20 +20,6 @@ from twisted.internet.protocol import Protocol
 from twisted.web._newclient import ResponseDone
 from StringIO import StringIO
 
-DEBUG=False
-
-# XXX pyOpenSSL is basically fucked in a whole host of distro's
-#     thanks to SSLv2 being summarily removed from libssl. 
-#     For the time being, to hell with SSL, it breaks everywhere
-#from twisted.internet.ssl import ClientContextFactory
-
-#class WebClientContextFactory(ClientContextFactory):
-#    def getContext(self, hostname, port):
-#        return ClientContextFactory.getContext(self)
-
-
-# From Twisted 11.1, Agent accepts a `connectTimeout` parameter.
-# From Twisted 12.1, Agent works differently and the subclass below breaks.
 if twisted_version.major >= 12:
     Agent = client.Agent
 else:
@@ -132,14 +120,6 @@ def getPageWithHeaders(contextFactory=None,
         return _headers, body
 
     url = str("http://%s:%d%s" % (host, port, path))
-
-    if DEBUG:
-        print "==========================="
-        print ">>uri: %s" % url
-        print ">>method: %s" % kwargs.get('method', None)
-        print ">>headers: %s" % kwargs.get('headers', None)
-        print ">>cookies: %s" % kwargs.get('cookies', None)
-        print ">>postdata: %s" % kwargs.get('postdata', None)
 
     if not "headers" in kwargs:
         kwargs["headers"] = {}

@@ -275,7 +275,7 @@ class RiakObject(object):
         return self._metas
 
     @defer.inlineCallbacks
-    def store(self, w=None, dw=None, return_body=True):
+    def store(self, w=None, dw=None, pw=None, return_body=True, if_none_match=False):
         """
         Store the object in Riak. When this operation completes, the
         object could contain new metadata and possibly new data if Riak
@@ -290,68 +290,32 @@ class RiakObject(object):
 
         :returns: deferred
 
-        .. todo:: make q a parameter.
         """
+
         # Use defaults if not specified...
         w = self._bucket.get_w(w)
-        dw = self._bucket.get_dw(w)
-        return_body = return_body and 'true' or 'false'
+        dw = self._bucket.get_dw(dw)
+        pw = self._bucket.get_pw(pw)
 
-        # Construct the URL...
-        params = {'returnbody': return_body, 'w': w, 'dw': dw}
-        host, port, url = util.build_rest_path(self._client, self._bucket,
-                                                    self._key, None, params)
+        # Issue the put over our transport
+        t = self._client.transport
 
-        # Construct the headers...
-        content_type = self.get_content_type()
-        headers = {'Accept': 'text/plain, */*; q=0.5',
-                   'Content-Type': content_type,
-                   'X-Riak-ClientId': self._client.get_client_id()}
-
-        # Add the vclock if it exists...
-        if (self.vclock() != None):
-            headers['X-Riak-Vclock'] = self.vclock()
-
-        # Add the meta data
-        for key in self._metas.keys():
-            # Riak spec says to send with this case.
-            headers['X-Riak-Meta-%s' % key] = self._metas[key]
-
-        # Add indexes
-        for rie in self._indexes:
-            key = 'X-Riak-Index-%s' % rie.get_field()
-            if key in headers:
-                headers[key] += ", " + rie.get_value()
-            else:
-                headers[key] = rie.get_value()
-
-        # Add the Links...
-        headers['Link'] = ''
-        for link in self._links:
-            if headers['Link'] != '':
-                headers['Link'] += ', '
-            headers['Link'] += link._to_link_header(self._client)
-
-        if (self._jsonize):
-            encoder = self._client.get_encoder(content_type)
-            content = encoder(self.get_data())
+        if self._key is None:
+            key, vclock, metadata = yield t.put_new(self, w=w, dw=dw, pw=pw, return_body=return_body, if_none_match=if_none_match)
+            self._exists = True
+            self._key = key
+            self._vclock = vclock
+            self.set_metadata(metadata)
         else:
-            content = self.get_data()
+            Result = yield t.put(self, w=w, dw=dw, pw=pw, return_body=return_body, if_none_match=if_none_match)
+            if Result is not None:
+                self.populate(Result)
 
-        # Run the operation.
-        response = yield util.http_request_deferred('PUT', host, port,
-                                                         url,
-                                                         headers,
-                                                         content)
-        expected = [200, 300]
-        if return_body:
-            expected.append(204)
-
-        self._populate(response, expected)
         defer.returnValue(self)
 
+
     @defer.inlineCallbacks
-    def reload(self, r=None):
+    def reload(self, r=None, pr=None, vtag=None):
         """
         Reload the object from Riak. When this operation completes, the
         object could contain new metadata and a new value, if the object
@@ -363,18 +327,16 @@ class RiakObject(object):
         """
         # Do the request...
         r = self._bucket.get_r(r)
-        params = {'r': r}
-        host, port, url = util.build_rest_path(self._client,
-                                self._bucket, self._key, None, params)
-        response = yield util.http_request_deferred('GET', host,
-                                                          port, url)
 
-        self._populate(response, [200, 300, 404])
+        r = self._bucket.get_r(r)
+        pr = self._bucket.get_pr(pr)
 
-        # If there are siblings, load the data for the first one by default...
-        if (self.has_siblings()):
-            obj = yield self.get_sibling(0)
-            self.set_data(obj.get_data())
+        result = self._client.transport.get(self, r=r, pr=pr, vtag=vtag)
+
+        self.clear()
+        if result is not None:
+            self.populate(result)
+
         defer.returnValue(self)
 
     @defer.inlineCallbacks
@@ -391,18 +353,18 @@ class RiakObject(object):
         :returns: self -- via deferred
         """
         # Use defaults if not specified...
+        rw = self._bucket.get_rw(rw)
+        r = self._bucket.get_r(r)
         w = self._bucket.get_w(w)
         dw = self._bucket.get_dw(dw)
-
-        # Construct the URL...
-        params = {'w': w, 'dw': dw}
-        host, port, url = util.build_rest_path(self._client,
-                                    self._bucket, self._key, None, params)
+        pr = self._bucket.get_pr(pr)
+        pw = self._bucket.get_pw(pw)
 
         # Run the operation...
-        response = yield util.http_request_deferred('DELETE', host,
-                                                         port, url)
-        self._populate(response, [204, 404])
+        response = yield self._client.transport.delete(
+                self, rw=rw, r=r, w=w, dw=dw, pr=pr, pw=pw)
+
+        self.clear()
         defer.returnValue(self)
 
     def clear(self):
@@ -434,8 +396,7 @@ class RiakObject(object):
 
     def _populate(self, response, expected_statuses):
         """
-        Populate the object given the output of util.http_request_deferred
-        and a list of expected statuses.
+        Populate the object
 
         :param response: http response body plus status
         :param expected_statuses: allowed statuses for which there
@@ -578,10 +539,6 @@ class RiakObject(object):
         # Run the request...
         vtag = self._siblings[i]
         params = {'r': r, 'vtag': vtag}
-        host, port, url = util.build_rest_path(self._client,
-                                    self._bucket, self._key, None, params)
-        response = yield util.http_request_deferred('GET', host,
-                                                         port, url)
 
         # Respond with a new object...
         obj = RiakObject(self._client, self._bucket, self._key)

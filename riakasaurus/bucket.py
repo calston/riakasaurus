@@ -30,6 +30,7 @@ class RiakBucket(object):
         self._r = None
         self._w = None
         self._dw = None
+        self._pw = None
         return None
 
     def get_name(self):
@@ -38,6 +39,31 @@ class RiakBucket(object):
         .. todo:: remove accessors
         """
         return self._name
+
+    def get_pw(self, pw=None):
+        """
+        Get the PW-value for this bucket, if it is set, otherwise return
+        the PW-value for the client.
+
+        :rtype: integer
+        """
+        if (pw is not None):
+            return pw
+        if (self._pw is not None):
+            return self._pw
+        return self._client.get_pw()
+
+    def set_pw(self, pw):
+        """
+        Set the PW-value for this bucket. See :func:`set_r` for more
+        information.
+
+        :param pw: The new PR-value
+        :type pw: integer
+        :rtype: self
+        """
+        self._pw = pw
+        return self
 
     def get_r(self, r=None):
         """
@@ -290,7 +316,6 @@ class RiakBucket(object):
 
         return self._client.transport.set_bucket_props(self, props)
 
-    @defer.inlineCallbacks
     def get_properties(self):
         """
         Retrieve a dictionary of all bucket properties.
@@ -298,23 +323,7 @@ class RiakBucket(object):
         :returns: dictionary -- via deferred
         """
 
-        # Run the request...
-        params = {'props': 'True', 'keys': 'False'}
-        host, port, url = util.build_rest_path(self._client, self,
-                                                    None, None, params)
-        response = yield util.http_request_deferred('GET', host,
-                                                         port, url)
-
-        # Use a riak_object.RiakObject to interpret the response.
-        # We are just interested in the value.
-        obj = riak_object.RiakObject(self._client, self, None)
-        obj._populate(response, [200])
-        if (not obj.exists()):
-            raise Exception('Error getting bucket properties.')
-
-        props = obj.get_data()
-        props = props['props']
-        defer.returnValue(props)
+        return self._client.transport.get_bucket_props(self)
 
     def list_keys(self):
         """

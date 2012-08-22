@@ -244,24 +244,7 @@ class RiakMapReduce(object):
                     keep_flag = True
                 query.append(phase._to_array())
 
-            # Construct the job, optionally set the timeout...
-            job = {'inputs': self._inputs, 'query': query}
-            if timeout != None:
-                job['timeout'] = timeout
-
-            content = json.dumps(job)
-
-        # Do the request...
-        host = self._client._host
-        port = self._client._port
-        url = "/" + self._client._mapred_prefix
-        headers = {"Content-Type": "application/json"}
-        response = yield util.http_request_deferred('POST', host, port,
-                                                    url, headers, content)
-        if response[0]["http_code"] > 299:
-            raise Exception("Error running map/reduce job. Error: " +
-                            response[1])
-        result = json.loads(response[1])
+        response = yield self._client.transport.mapred(self._inputs, query)
 
         # If the last phase is NOT a link phase, then return the result.
         if self._phases:
@@ -276,7 +259,11 @@ class RiakMapReduce(object):
         # results to RiakLink objects.
         a = []
         for r in result:
-            link = riak_link.RiakLink(r[0], r[1], r[2])
+            if len(r) == 2:
+                link = riak_link.RiakLink(r[0], r[1])
+            elif len(r) == 3:
+                link = riak_link.RiakLink(r[0], r[1], r[2])
+
             link._client = self._client
             a.append(link)
 
