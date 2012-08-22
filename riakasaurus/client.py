@@ -14,6 +14,8 @@ from twisted.internet import defer
 from riakasaurus import mapreduce, util, bucket
 from riakasaurus.search import RiakSearch
 
+from riakasaurus import transport
+
 
 class RiakClient(object):
     """
@@ -22,7 +24,8 @@ class RiakClient(object):
     """
     def __init__(self, host='127.0.0.1', port=8098,
                 prefix='riak', mapred_prefix='mapred',
-                client_id=None, r_value=2, w_value=2, dw_value=0):
+                client_id=None, r_value=2, w_value=2, dw_value=0, 
+                transport=transport.HTTPTransport):
         """
         Construct a new RiakClient object.
 
@@ -45,6 +48,8 @@ class RiakClient(object):
         self._decoders = {'application/json': json.loads,
                           'text/json': json.loads}
         self._solr = None
+
+        self.transport = transport(self) 
 
     def get_r(self):
         """

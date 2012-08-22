@@ -279,7 +279,6 @@ class RiakBucket(object):
     def search(self, query, **params):
         return self._client.solr().search(self._name, query, **params)
 
-    @defer.inlineCallbacks
     def set_properties(self, props):
         """
         Set multiple bucket properties in one call. This should only be
@@ -288,24 +287,8 @@ class RiakBucket(object):
         :param props: a dictionary of keys and values to store.
         :returns: deferred
         """
-        host, port, url = util.build_rest_path(self._client, self)
-        headers = {'Content-Type': 'application/json'}
-        content = json.dumps({'props': props})
 
-        #Run the request...
-        response = yield util.http_request_deferred('PUT', host,
-                                                         port, url,
-                                                         headers, content)
-
-        # Handle the response...
-        if (response == None):
-            raise Exception('Error setting bucket properties.')
-
-        # Check the response value...
-        status = response[0]['http_code']
-        if (status != 204):
-            raise Exception('Error setting bucket properties.')
-        defer.returnValue(response)
+        return self._client.transport.set_bucket_props(self, props)
 
     @defer.inlineCallbacks
     def get_properties(self):
