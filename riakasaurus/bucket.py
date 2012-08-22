@@ -27,10 +27,14 @@ class RiakBucket(object):
         """
         self._client = client
         self._name = name
+
         self._r = None
         self._w = None
         self._dw = None
+        self._rw = None
+        self._pr = None
         self._pw = None
+
         return None
 
     def get_name(self):
@@ -63,6 +67,31 @@ class RiakBucket(object):
         :rtype: self
         """
         self._pw = pw
+        return self
+
+    def get_pr(self, pr=None):
+        """
+        Get the PR-value for this bucket, if it is set, otherwise return
+        the PR-value for the client.
+
+        :rtype: integer
+        """
+        if (pr is not None):
+            return pr
+        if (self._pr is not None):
+            return self._pr
+        return self._client.get_pr()
+
+    def set_pr(self, pr):
+        """
+        Set the PR-value for this bucket. See :func:`set_r` for more
+        information.
+
+        :param pr: The new PR-value
+        :type pr: integer
+        :rtype: self
+        """
+        self._pr = pr
         return self
 
     def get_r(self, r=None):

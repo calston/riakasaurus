@@ -35,6 +35,7 @@ class RiakObject(object):
         self._links = []
         self._siblings = []
         self._metas = {}
+        self._usermeta = {}
         self._indexes = []
         self._exists = False
         self._data = None
@@ -65,6 +66,25 @@ class RiakObject(object):
         """
         return self._data
 
+    def get_encoded_data(self):
+        """
+        Get the data encoded for storing
+        """
+        if self._jsonize == True:
+            content_type = self.get_content_type()
+            encoder = self._client.get_encoder(content_type)
+            if encoder is None:
+                if isinstance(self._data, basestring):
+                    return self._data.encode()
+                else:
+                    raise RiakError("No encoder for non-string data "
+                                    "with content type ${0}".
+                                    format(content_type))
+            else:
+                return encoder(self._data)
+        else:
+            return self._data
+
     def set_data(self, data):
         """
         Set the data stored in this object. This data will be
@@ -75,6 +95,23 @@ class RiakObject(object):
         .. todo:: remove accessor
         """
         self._data = data
+        return self
+
+    def set_encoded_data(self, data):
+        """
+        Set the object data from an encoded string. Make sure
+        the metadata has been set correctly first.
+        """
+        if self._jsonize == True:
+            content_type = self.get_content_type()
+            decoder = self._client.get_decoder(content_type)
+            if decoder is None:
+                # if no decoder, just set as string data for application to handle
+                self._data = data
+            else:
+                self._data = decoder(data)
+        else:
+            self._data = data
         return self
 
     def status(self):
@@ -378,6 +415,7 @@ class RiakObject(object):
         self._links = []
         self._data = None
         self._metas = {}
+        self._usermeta = {}
         self._exists = False
         self._siblings = []
         self._indexes = []
@@ -394,7 +432,7 @@ class RiakObject(object):
         else:
             return None
 
-    def _populate(self, response, expected_statuses):
+    def populate(self, response):
         """
         Populate the object
 
@@ -476,6 +514,42 @@ class RiakObject(object):
 
         return self
 
+    def set_metadata(self, metadata):
+        """
+        Set the metadata stored in this object.
+
+        :param metadata: The data to store.
+        :type metadata: dict
+        :rtype: data
+        """
+        self._metas = metadata
+        return self
+
+    def get_metadata(self):
+        """
+        Get the metadata stored in this object. Will return an associative
+        array
+
+        :rtype: dict
+        """
+        return self._metas
+
+    def get_usermeta(self):
+        return self._usermeta
+
+    def set_usermeta(self, usermeta):
+        """
+        Sets the custom user metadata on this object. This doesn't include things
+        like content type and links, but only user-defined meta attributes stored
+        with the Riak object.
+
+        :param userdata: The user metadata to store.
+        :type userdata: dict
+        :rtype: data
+        """
+        self._usermeta = usermeta
+        return self
+
     def _populate_metas(self):
         """
         Scan headers looking for x-riak-meta-
@@ -543,7 +617,7 @@ class RiakObject(object):
         # Respond with a new object...
         obj = RiakObject(self._client, self._bucket, self._key)
         obj._jsonize = self._jsonize
-        obj._populate(response, [200])
+        obj.populate(response)
         defer.returnValue(obj)
 
     @defer.inlineCallbacks

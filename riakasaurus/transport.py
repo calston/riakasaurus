@@ -11,6 +11,9 @@ from cStringIO import StringIO
 
 from xml.etree import ElementTree
 
+# MD_ resources
+from riakasaurus.metadata import *
+
 
 class BodyReceiver(protocol.Protocol):
     """ Simple buffering consumer for body objects """
@@ -52,6 +55,7 @@ class HTTPTransport(object):
         self.host = client._host
         self.port = client._port
         self.client = client
+        self._client_id = None
 
     def http_response(self, response):
         def haveBody(body):
@@ -77,8 +81,6 @@ class HTTPTransport(object):
                 h[k] = [v]
             else:
                 h[k] = v 
-
-        print repr(url), repr(h), repr(body)
 
         if body:
             bodyProducer = StringProducer(body)
@@ -595,9 +597,9 @@ class HTTPTransport(object):
         """Build the headers for a POST/PUT request."""
 
         # Construct the headers...
-        headers = MultiDict({'Accept' : 'text/plain, */*; q=0.5',
-                             'Content-Type' : robj.get_content_type(),
-                             'X-Riak-ClientId' : self._client_id})
+        headers = {'Accept' : 'text/plain, */*; q=0.5',
+                   'Content-Type' : robj.get_content_type(),
+                   'X-Riak-ClientId' : self._client_id}
 
         # Add the vclock if it exists...
         if robj.vclock() is not None:

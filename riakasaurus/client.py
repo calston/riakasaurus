@@ -64,6 +64,26 @@ class RiakClient(object):
         """
         return self._r
 
+    def get_rw(self):
+        """
+        Get the RW-value for this ``RiakClient`` instance. (default "quorum")
+
+        :rtype: integer
+        """
+        return self._rw
+
+    def set_rw(self, rw):
+        """
+        Set the RW-value for this ``RiakClient`` instance. See :func:`set_r` for a
+        description of how these values are used.
+
+        :param rw: The RW value.
+        :type rw: integer
+        :rtype: self
+        """
+        self._rw = rw
+        return self
+
     def get_pw(self):
         """
         Get the PW-value setting for this ``RiakClient``. (default 0)
@@ -71,6 +91,38 @@ class RiakClient(object):
         :rtype: integer
         """
         return self._pw
+
+    def set_pw(self, pw):
+        """
+        Set the PW-value for this ``RiakClient`` instance. See :func:`set_r` for a
+        description of how these values are used.
+
+        :param pw: The W value.
+        :type pw: integer
+        :rtype: self
+        """
+        self._pw = pw
+        return self
+
+    def get_pr(self):
+        """
+        Get the PR-value setting for this ``RiakClient``. (default 0)
+
+        :rtype: integer
+        """
+        return self._pr
+
+    def set_pr(self, pr):
+        """
+        Set the PR-value for this ``RiakClient`` instance. See :func:`set_r` for a
+        description of how these values are used.
+
+        :param pr: The PR value.
+        :type pr: integer
+        :rtype: self
+        """
+        self._pr = pr
+        return self
 
     def set_r(self, r):
         """
@@ -191,7 +243,7 @@ class RiakClient(object):
         :returns: True if alive -- via deferred.
         """
 
-        return self._client.transport.ping()
+        return self.transport.ping()
 
     def set_mapreduce(self, mreduce):
         """
