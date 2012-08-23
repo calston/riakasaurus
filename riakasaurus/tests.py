@@ -35,7 +35,7 @@ def randint():
     return random.randint(1, 999999)
 
 
-class RiakTestCase1(unittest.TestCase):
+class Tests(unittest.TestCase):
     """
     trial unit tests.
     """
@@ -73,14 +73,20 @@ class RiakTestCase1(unittest.TestCase):
 
         results = yield self.client.index(self.bucket_name,
                                           'field1_bin', 'val2').run()
-        self.assertEqual(results[0], [self.bucket_name, u'foo2'])
+        
+        r1 = yield results[0].get()
+
+        self.assertEqual(r1.get_key(), u'foo2')
 
         results = yield self.client.index(self.bucket_name, 'field2_int', 1,
                                           2000).run()
 
-        self.assertEqual(sorted(results),
-                         [[self.bucket_name, u'foo1'],
-                          [self.bucket_name, u'foo2']])
+        r1 = []
+        for i in results:
+            r1.append((yield i.get()).get_key())
+
+        self.assertEqual(sorted(r1),
+                         ['foo1', 'foo2'])
 
         log.msg("done secondary_index")
 
@@ -141,7 +147,9 @@ class RiakTestCase1(unittest.TestCase):
         s = self.client.search(self.bucket_name, 'foo:test1')
         keys = yield s.run()
 
-        self.assertTrue(keys[0][1] == u'foo1')
+        v1 = yield keys[0].get()
+
+        self.assertTrue(v1.get_key() == u'foo1')
 
         yield obj1.delete()
         yield self.bucket.disable_search()
@@ -333,6 +341,7 @@ class RiakTestCase1(unittest.TestCase):
         # Test get_sibling()/get_siblings()...
         siblings = yield obj.get_siblings()
         obj3 = yield obj.get_sibling(3)
+
         self.assertEqual(siblings[3].get_data(), obj3.get_data())
 
         # Resolve the conflict, and then do a get...
@@ -464,31 +473,6 @@ class RiakTestCase1(unittest.TestCase):
         result = yield job.run()
         self.assertEqual(result, [10])
         log.msg('done javascript_arg_map_reduce')
-
-    @defer.inlineCallbacks
-    def test_javascript_manual_map(self):
-        """manual javascript mapping"""
-        log.msg('*** manual javascript_source_map')
-
-        # create something to find
-        obj = self.bucket.new('blue_foo1', 'blueprint')
-        yield obj.store()
-
-        job = self.client.set_mapreduce(
-"""
-{"inputs": "%(bucket)s",
- "query":[{"map":{"language": "javascript",
-                  "keep": true,
-                  "source": "
-                    function(value, keyData, arg) {
-                        return [value.key];
-                 }"},
-           },
-          ]}
-""" % dict(bucket=self.bucket_name))
-
-        result = yield job.run()
-        self.assertEqual([u'blue_foo1', ], result)
 
     @defer.inlineCallbacks
     def test_erlang_map_reduce(self):

@@ -56,6 +56,9 @@ class RiakClient(object):
 
         self.transport = transport(self) 
 
+    def get_transport(self):
+        return self.transport
+
     def get_r(self):
         """
         Get the R-value setting for this RiakClient. (default 2)
@@ -236,7 +239,6 @@ class RiakClient(object):
         """
         return bucket.RiakBucket(self, name)
 
-    @defer.inlineCallbacks
     def is_alive(self):
         """
         Check if the Riak server for this RiakClient is alive.
@@ -244,14 +246,6 @@ class RiakClient(object):
         """
 
         return self.transport.ping()
-
-    def set_mapreduce(self, mreduce):
-        """
-        Manually set a map/reduce query.
-        Useful when copying examples from the web.
-        """
-        mr = mapreduce.RiakMapReduce(self)
-        return mr.set_mapreduce(mreduce)
 
     def add(self, *args):
         """
@@ -286,7 +280,7 @@ class RiakClient(object):
         :returns: list -- via deferred
         """
 
-        return self._client.transport.get_buckets()
+        return self.transport.get_buckets()
 
     def index(self, *args):
         """

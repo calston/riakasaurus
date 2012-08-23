@@ -5,6 +5,8 @@ from twisted.web.client import Agent
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IBodyProducer
 
+from distutils.version import StrictVersion
+
 import urllib
 import re, csv
 from cStringIO import StringIO
@@ -14,6 +16,102 @@ from xml.etree import ElementTree
 # MD_ resources
 from riakasaurus.metadata import *
 
+from riakasaurus.riak_index_entry import RiakIndexEntry
+from riakasaurus.mapreduce import RiakLink
+
+MAX_LINK_HEADER_SIZE = 8192 - 8
+
+versions = {
+    1: StrictVersion("1.0.0"),
+    1.1: StrictVersion("1.1.0"),
+    1.2: StrictVersion("1.2.0")
+    }
+
+class FeatureDetection(object):
+    _s_version = None
+
+    def _server_version(self):
+        """
+        Gets the server version from the server. To be implemented by
+        the individual transport class.
+        :rtype string
+        """
+        raise NotImplementedError
+
+    @defer.inlineCallbacks
+    def phaseless_mapred(self):
+        """
+        Whether MapReduce requests can be submitted without phases.
+        :rtype bool
+        """
+        d = yield self.server_version() 
+        defer.returnValue(d >= versions[1.1])
+
+    @defer.inlineCallbacks
+    def pb_indexes(self):
+        """
+        Whether secondary index queries are supported over Protocol
+        Buffers
+
+        :rtype bool
+        """
+        d = yield self.server_version() 
+        defer.returnValue(d >= versions[1.2])
+
+    @defer.inlineCallbacks
+    def pb_search(self):
+        """
+        Whether search queries are supported over Protocol Buffers
+        :rtype bool
+        """
+        d = yield self.server_version() 
+        defer.returnValue(d >= versions[1.2])
+
+    @defer.inlineCallbacks
+    def pb_conditionals(self):
+        """
+        Whether conditional fetch/store semantics are supported over
+        Protocol Buffers
+        :rtype bool
+        """
+        d = yield self.server_version() 
+        defer.returnValue(d >= versions[1])
+
+    @defer.inlineCallbacks
+    def quorum_controls(self):
+        """
+        Whether additional quorums and FSM controls are available,
+        e.g. primary quorums, basic_quorum, notfound_ok
+        :rtype bool
+        """
+        d = yield self.server_version() 
+        defer.returnValue(d >= versions[1])
+
+    @defer.inlineCallbacks
+    def tombstone_vclocks(self):
+        """
+        Whether 'not found' responses might include vclocks
+        :rtype bool
+        """
+        d = yield self.server_version() 
+        defer.returnValue(d >= versions[1])
+
+    @defer.inlineCallbacks
+    def pb_head(self):
+        """
+        Whether partial-fetches (vclock and metadata only) are
+        supported over Protocol Buffers
+        :rtype bool
+        """
+        d = yield self.server_version() 
+        defer.returnValue(d >= versions[1])
+
+    @defer.inlineCallbacks
+    def server_version(self):
+        if not self._s_version:
+            self._s_version = yield self._server_version()
+
+        defer.returnValue(StrictVersion(self._s_version))
 
 class BodyReceiver(protocol.Protocol):
     """ Simple buffering consumer for body objects """
@@ -48,7 +146,7 @@ class StringProducer(object):
     def stopProducing(self):
         pass
 
-class HTTPTransport(object):
+class HTTPTransport(FeatureDetection):
     """ HTTP Transport for Riak """
     def __init__(self, client):
         self._prefix = client._prefix
@@ -88,7 +186,7 @@ class HTTPTransport(object):
             bodyProducer = None
 
         return Agent(reactor).request(
-                method, url, Headers(h), bodyProducer
+                method, str(url), Headers(h), bodyProducer
             ).addCallback(self.http_response)
 
     def build_rest_path(self, bucket=None, key=None, params=None, prefix=None) :
@@ -193,17 +291,18 @@ class HTTPTransport(object):
             defer.returnValue(None)
 
     # FeatureDetection API - private
+    @defer.inlineCallbacks
     def _server_version(self):
-        stats = self.stats()
+        stats = yield self.stats()
         if stats is not None:
-            return stats['riak_kv_version']
+            defer.returnValue(stats['riak_kv_version'])
         # If stats is disabled, we can't assume the Riak version
         # is >= 1.1. However, we can assume the new URL scheme is
         # at least version 1.0
         elif 'riak_kv_wm_buckets' in self.get_resources():
-            return "1.0.0"
+            defer.returnValue("1.0.0")
         else:
-            return "0.14.0"
+            defer.returnValue("0.14.0")
    
     @defer.inlineCallbacks
     def get_resources(self):
@@ -299,7 +398,8 @@ class HTTPTransport(object):
         headers = {}
         url = self.build_rest_path(robj.get_bucket(), robj.get_key(),
                                    params=params)
-        if self.tombstone_vclocks() and robj.vclock() is not None:
+        ts = yield self.tombstone_vclocks()
+        if ts and robj.vclock() is not None:
             headers['X-Riak-Vclock'] = robj.vclock()
         response = yield self.http_request('DELETE', url, headers)
         self.check_http_code(response, [204, 404])
@@ -345,7 +445,8 @@ class HTTPTransport(object):
         """
         Run a MapReduce query.
         """
-        if not self.phaseless_mapred() and (query is None or len(query) is 0):
+        plm = yield self.phaseless_mapred()
+        if not plm and (query is None or len(query) is 0):
             raise Exception('Phase-less MapReduce is not supported by this Riak node')
 
         # Construct the job, optionally set the timeout...
@@ -526,7 +627,7 @@ class HTTPTransport(object):
                 if current_header != '': header = ', ' + header
                 current_header += header
 
-            headers.add('Link', current_header)
+            headers['Link'] = current_header
 
         return headers
 
@@ -723,3 +824,6 @@ class XMLSearchResult(object):
         return {'num_found':self.num_found,
                 'max_score':self.max_score,
                 'docs': self.docs }
+
+
+
