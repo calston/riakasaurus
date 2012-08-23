@@ -6,7 +6,7 @@ Basho Technologies, Inc. http://basho.com/
 Modules based on code originally disbributed by Basho:
     http://riak.basho.com/python_client_api/riak.html
 """
-VERSION = '1.0.4'
+VERSION = '1.0.6'
 
 LICENSE = """
 %s
@@ -44,3 +44,8 @@ Thank you Basho for open sourcing your interface libraries.
 
 """
 
+class RiakError(Exception) :
+    def __init__(self, value):
+        self.value = value
+    def __str__(self):
+        return repr(self.value)

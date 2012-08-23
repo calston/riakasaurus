@@ -3,10 +3,10 @@
 
 """
 
-from riakasaurus import riak_object, mapreduce, bucket, client, riak_link
+from riakasaurus import riak_object, mapreduce, bucket, client
 
 RiakClient = client.RiakClient
 RiakBucket = bucket.RiakBucket
 RiakObject = riak_object.RiakObject
 RiakMapReduce = mapreduce.RiakMapReduce
-RiakLink = riak_link.RiakLink
+RiakLink = mapreduce.RiakLink

@@ -14,6 +14,8 @@ from twisted.internet import defer
 from riakasaurus import mapreduce, util, bucket
 from riakasaurus.search import RiakSearch
 
+from riakasaurus import transport
+
 
 class RiakClient(object):
     """
@@ -22,7 +24,8 @@ class RiakClient(object):
     """
     def __init__(self, host='127.0.0.1', port=8098,
                 prefix='riak', mapred_prefix='mapred',
-                client_id=None, r_value=2, w_value=2, dw_value=0):
+                client_id=None, r_value="default", w_value="default", dw_value="default",
+                transport=transport.HTTPTransport):
         """
         Construct a new RiakClient object.
 
@@ -40,11 +43,21 @@ class RiakClient(object):
         self._r = r_value
         self._w = w_value
         self._dw = dw_value
+
+        self._rw = "default"
+        self._pr = "default"
+        self._pw = "default"
+
         self._encoders = {'application/json': json.dumps,
                           'text/json': json.dumps}
         self._decoders = {'application/json': json.loads,
                           'text/json': json.loads}
         self._solr = None
+
+        self.transport = transport(self) 
+
+    def get_transport(self):
+        return self.transport
 
     def get_r(self):
         """
@@ -53,6 +66,66 @@ class RiakClient(object):
         .. todo:: remove accessor
         """
         return self._r
+
+    def get_rw(self):
+        """
+        Get the RW-value for this ``RiakClient`` instance. (default "quorum")
+
+        :rtype: integer
+        """
+        return self._rw
+
+    def set_rw(self, rw):
+        """
+        Set the RW-value for this ``RiakClient`` instance. See :func:`set_r` for a
+        description of how these values are used.
+
+        :param rw: The RW value.
+        :type rw: integer
+        :rtype: self
+        """
+        self._rw = rw
+        return self
+
+    def get_pw(self):
+        """
+        Get the PW-value setting for this ``RiakClient``. (default 0)
+
+        :rtype: integer
+        """
+        return self._pw
+
+    def set_pw(self, pw):
+        """
+        Set the PW-value for this ``RiakClient`` instance. See :func:`set_r` for a
+        description of how these values are used.
+
+        :param pw: The W value.
+        :type pw: integer
+        :rtype: self
+        """
+        self._pw = pw
+        return self
+
+    def get_pr(self):
+        """
+        Get the PR-value setting for this ``RiakClient``. (default 0)
+
+        :rtype: integer
+        """
+        return self._pr
+
+    def set_pr(self, pr):
+        """
+        Set the PR-value for this ``RiakClient`` instance. See :func:`set_r` for a
+        description of how these values are used.
+
+        :param pr: The PR value.
+        :type pr: integer
+        :rtype: self
+        """
+        self._pr = pr
+        return self
 
     def set_r(self, r):
         """
@@ -166,23 +239,13 @@ class RiakClient(object):
         """
         return bucket.RiakBucket(self, name)
 
-    @defer.inlineCallbacks
     def is_alive(self):
         """
         Check if the Riak server for this RiakClient is alive.
         :returns: True if alive -- via deferred.
         """
-        response = yield util.http_request_deferred('GET', self._host,
-                                          self._port, '/ping')
-        defer.returnValue((response != None) and (response[1] == 'OK'))
 
-    def set_mapreduce(self, mreduce):
-        """
-        Manually set a map/reduce query.
-        Useful when copying examples from the web.
-        """
-        mr = mapreduce.RiakMapReduce(self)
-        return mr.set_mapreduce(mreduce)
+        return self.transport.ping()
 
     def add(self, *args):
         """
@@ -210,31 +273,14 @@ class RiakClient(object):
         mr = mapreduce.RiakMapReduce(self)
         return apply(mr.link, args)
 
-    @defer.inlineCallbacks
     def list_buckets(self):
         """
         Retrieve a list of all buckets.
 
         :returns: list -- via deferred
         """
-        # Create the request
-        params = {"buckets": "true"}
 
-        host, port, url = util.build_rest_path(self,
-                                                    None,
-                                                    None,
-                                                    None,
-                                                    params)
-        raw_response = yield util.http_request_deferred('GET', host,
-                                                             port, url)
-
-        if raw_response[0]["http_code"] != 200:
-            raise Exception('Error listing buckets.')
-
-        # Parse the bucket list
-        buckets = json.loads(raw_response[1])["buckets"]
-
-        defer.returnValue([urllib.unquote(x) for x in buckets])
+        return self.transport.get_buckets()
 
     def index(self, *args):
         """
