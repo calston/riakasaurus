@@ -1,5 +1,8 @@
 from zope.interface import implements
 
+from twisted.protocols.basic import LineReceiver 
+LineReceiver.MAX_LENGTH = 1024*1024*64 
+
 from twisted.internet import defer, reactor, protocol
 from twisted.web.client import Agent
 from twisted.web.http_headers import Headers
@@ -470,6 +473,7 @@ class HTTPTransport(FeatureDetection):
         result = self.decodeJson(response[1])
         defer.returnValue(result)
 
+    @defer.inlineCallbacks
     def get_index(self, bucket, index, startkey, endkey=None):
         """
         Performs a secondary index query.
@@ -479,11 +483,13 @@ class HTTPTransport(FeatureDetection):
         if endkey:
             segments.append(str(endkey))
         uri = '/%s' % ('/'.join(segments))
-        headers, data = response = self.get_request(uri)
+        headers, data = response = yield self.get_request(uri)
         self.check_http_code(response, [200])
         jsonData = self.decodeJson(data)
-        return jsonData[u'keys'][:]
+        
+        defer.returnValue(jsonData[u'keys'][:])
 
+    @defer.inlineCallbacks
     def search(self, index, query, **params):
         """
         Performs a search query.
@@ -499,13 +505,13 @@ class HTTPTransport(FeatureDetection):
         options.update(params)
         # TODO: use resource detection
         uri = "/solr/%s/select" % index
-        headers, data = response = self.get_request(uri, options)
+        headers, data = response = yield self.get_request(uri, options)
         self.check_http_code(response, [200])
         if 'json' in headers['content-type']:
             results = self.decodeJson(data)
-            return self._normalize_json_search_response(results)
+            defer.returnValue(self._normalize_json_search_response(results))
         elif 'xml' in headers['content-type']:
-            return self._normalize_xml_search_response(data)
+            defer.returnValue(self._normalize_xml_search_response(data))
         else:
             raise ValueError("Could not decode search response")
 
