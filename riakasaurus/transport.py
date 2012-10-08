@@ -302,7 +302,7 @@ class HTTPTransport(FeatureDetection):
         # If stats is disabled, we can't assume the Riak version
         # is >= 1.1. However, we can assume the new URL scheme is
         # at least version 1.0
-        elif 'riak_kv_wm_buckets' in self.get_resources():
+        elif 'riak_kv_wm_buckets' in (yield self.get_resources()):
             defer.returnValue("1.0.0")
         else:
             defer.returnValue("0.14.0")
