@@ -314,7 +314,7 @@ class HTTPTransport(FeatureDetection):
         :rtype dict
         """
         response = yield self.http_request('GET', '/', {'Accept':'application/json'})
-        if response[0]['http_status'] is 200:
+        if response[0]['http_code'] is 200:
             defer.returnValue(self.decodeJson(response[1]))
         else:
             defer.returnValue({})
