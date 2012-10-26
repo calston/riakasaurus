@@ -1,10 +1,9 @@
 from zope.interface import implements
 
-from twisted.protocols.basic import LineReceiver 
-LineReceiver.MAX_LENGTH = 1024*1024*64 
+from twisted.protocols.basic import LineReceiver
+LineReceiver.MAX_LENGTH = 1024*1024*64
 
 from twisted.internet import defer, reactor, protocol
-from twisted.web.client import Agent
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IBodyProducer
 
@@ -18,6 +17,7 @@ from xml.etree import ElementTree
 
 # MD_ resources
 from riakasaurus.metadata import *
+from riakasaurus.util import Agent
 
 from riakasaurus.riak_index_entry import RiakIndexEntry
 from riakasaurus.mapreduce import RiakLink
@@ -29,6 +29,7 @@ versions = {
     1.1: StrictVersion("1.1.0"),
     1.2: StrictVersion("1.2.0")
     }
+
 
 class FeatureDetection(object):
     _s_version = None
@@ -47,7 +48,7 @@ class FeatureDetection(object):
         Whether MapReduce requests can be submitted without phases.
         :rtype bool
         """
-        d = yield self.server_version() 
+        d = yield self.server_version()
         defer.returnValue(d >= versions[1.1])
 
     @defer.inlineCallbacks
@@ -58,7 +59,7 @@ class FeatureDetection(object):
 
         :rtype bool
         """
-        d = yield self.server_version() 
+        d = yield self.server_version()
         defer.returnValue(d >= versions[1.2])
 
     @defer.inlineCallbacks
@@ -67,7 +68,7 @@ class FeatureDetection(object):
         Whether search queries are supported over Protocol Buffers
         :rtype bool
         """
-        d = yield self.server_version() 
+        d = yield self.server_version()
         defer.returnValue(d >= versions[1.2])
 
     @defer.inlineCallbacks
@@ -77,7 +78,7 @@ class FeatureDetection(object):
         Protocol Buffers
         :rtype bool
         """
-        d = yield self.server_version() 
+        d = yield self.server_version()
         defer.returnValue(d >= versions[1])
 
     @defer.inlineCallbacks
@@ -87,7 +88,7 @@ class FeatureDetection(object):
         e.g. primary quorums, basic_quorum, notfound_ok
         :rtype bool
         """
-        d = yield self.server_version() 
+        d = yield self.server_version()
         defer.returnValue(d >= versions[1])
 
     @defer.inlineCallbacks
@@ -96,7 +97,7 @@ class FeatureDetection(object):
         Whether 'not found' responses might include vclocks
         :rtype bool
         """
-        d = yield self.server_version() 
+        d = yield self.server_version()
         defer.returnValue(d >= versions[1])
 
     @defer.inlineCallbacks
@@ -106,7 +107,7 @@ class FeatureDetection(object):
         supported over Protocol Buffers
         :rtype bool
         """
-        d = yield self.server_version() 
+        d = yield self.server_version()
         defer.returnValue(d >= versions[1])
 
     @defer.inlineCallbacks
@@ -119,7 +120,7 @@ class FeatureDetection(object):
 class BodyReceiver(protocol.Protocol):
     """ Simple buffering consumer for body objects """
     def __init__(self, finished):
-        self.finished = finished 
+        self.finished = finished
         self.buffer = StringIO()
 
     def dataReceived(self, buffer):
@@ -163,7 +164,7 @@ class HTTPTransport(FeatureDetection):
             headers = {"http_code": response.code}
             for key, val in response.headers.getAllRawHeaders():
                 headers[key.lower()] = val[0]
-            
+
             return headers, body.read()
 
         if response.length:
@@ -181,7 +182,7 @@ class HTTPTransport(FeatureDetection):
             if not isinstance(v, list):
                 h[k] = [v]
             else:
-                h[k] = v 
+                h[k] = v
 
         if body:
             bodyProducer = StringProducer(body)
@@ -231,14 +232,14 @@ class HTTPTransport(FeatureDetection):
     def get_keys(self, bucket):
         params = {'props' : 'True', 'keys' : 'true'}
         url = self.build_rest_path(bucket, params=params)
-        
+
 
         headers, encoded_props = yield self.http_request('GET', url)
 
         if headers['http_code'] == 200:
             props = self.decodeJson(encoded_props)
         else:
-            raise Exception('Error getting bucket properties.') 
+            raise Exception('Error getting bucket properties.')
 
         defer.returnValue(props['keys'])
 
@@ -246,7 +247,7 @@ class HTTPTransport(FeatureDetection):
     def set_bucket_props(self, bucket, props):
         """
         Set bucket properties
-        """ 
+        """
         url = self.build_rest_path(bucket)
         headers = {'Content-Type': 'application/json'}
         content = self.encodeJson({'props': props})
@@ -306,7 +307,7 @@ class HTTPTransport(FeatureDetection):
             defer.returnValue("1.0.0")
         else:
             defer.returnValue("0.14.0")
-   
+
     @defer.inlineCallbacks
     def get_resources(self):
         """
@@ -486,7 +487,7 @@ class HTTPTransport(FeatureDetection):
         headers, data = response = yield self.get_request(uri)
         self.check_http_code(response, [200])
         jsonData = self.decodeJson(data)
-        
+
         defer.returnValue(jsonData[u'keys'][:])
 
     @defer.inlineCallbacks
