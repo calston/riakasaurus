@@ -20,8 +20,23 @@ from twisted.internet.protocol import Protocol
 from twisted.web._newclient import ResponseDone
 from StringIO import StringIO
 
+
+class QuietHTTP11ClientFactory(client._HTTP11ClientFactory):
+    noisy = False
+
+
+class QuietHTTPConnectionPool(client.HTTPConnectionPool):
+    _factory = QuietHTTP11ClientFactory
+
+
 if twisted_version.major >= 12:
-    Agent = client.Agent
+
+    class Agent(client.Agent):
+        def __init__(self, reactor, pool=None, **kwargs):
+            if pool is None:
+                pool = QuietHTTPConnectionPool(reactor, False)
+            client.Agent.__init__(self, reactor, pool=pool, **kwargs)
+
 else:
     class Agent(client.Agent):
         """
@@ -31,9 +46,12 @@ else:
 
         def __init__(self, reactor,
                            contextFactory=None,
-                           connectTimeout=240):
-            self._reactor = reactor
-            self._contextFactory = contextFactory
+                           connectTimeout=240,
+                           pool=None):
+            if pool is None:
+                pool = QuietHTTPConnectionPool(reactor, False)
+            client._AgentBase.__init__(self, reactor,
+                contextFactory=contextFactory, pool=pool)
             self.connectTimeout = connectTimeout
 
 
