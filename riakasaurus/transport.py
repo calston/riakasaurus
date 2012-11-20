@@ -321,7 +321,7 @@ class HTTPTransport(FeatureDetection):
             defer.returnValue({})
 
     @defer.inlineCallbacks
-    def get(self, robj, r = None, pr = None, vtag = None) :
+    def get(self, robj, r = None, pr = None, vtag = None, method='GET') :
         """
         Get a bucket/key from the server
         """
@@ -332,11 +332,12 @@ class HTTPTransport(FeatureDetection):
             params['vtag'] = vtag
         url = self.build_rest_path(robj.get_bucket(), robj.get_key(),
                                    params=params)
-        response = yield self.http_request('GET', url)
+        response = yield self.http_request(method, url)
         defer.returnValue(
             self.parse_body(response, [200, 300, 404])
         )
 
+        
     def put(self, robj, w = None, dw = None, pw = None, return_body = True, if_none_match=False):
         """
         Serialize put request and deserialize response
