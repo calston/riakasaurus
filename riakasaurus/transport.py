@@ -321,7 +321,7 @@ class HTTPTransport(FeatureDetection):
             defer.returnValue({})
 
     @defer.inlineCallbacks
-    def get(self, robj, r = None, pr = None, vtag = None, method='GET') :
+    def get(self, robj, r = None, pr = None, vtag = None) :
         """
         Get a bucket/key from the server
         """
@@ -332,11 +332,27 @@ class HTTPTransport(FeatureDetection):
             params['vtag'] = vtag
         url = self.build_rest_path(robj.get_bucket(), robj.get_key(),
                                    params=params)
-        response = yield self.http_request(method, url)
+        response = yield self.http_request('GET', url)
         defer.returnValue(
             self.parse_body(response, [200, 300, 404])
         )
 
+    @defer.inlineCallbacks
+    def head(self, robj, r = None, pr = None, vtag = None) :
+        """
+        Get metadata for a bucket/key from the server, basically
+        the same as get() but retrieves no data
+        """
+        params = {'r' : r, 'pr': pr}
+        if vtag is not None:
+            params['vtag'] = vtag
+        url = self.build_rest_path(robj.get_bucket(), robj.get_key(),
+                                   params=params)
+        response = yield self.http_request('HEAD', url)
+        defer.returnValue(
+            self.parse_body(response, [200, 300, 404])
+        )
+        
         
     def put(self, robj, w = None, dw = None, pw = None, return_body = True, if_none_match=False):
         """
