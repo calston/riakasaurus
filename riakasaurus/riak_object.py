@@ -451,6 +451,30 @@ class RiakObject(object):
         defer.returnValue(self)
 
     @defer.inlineCallbacks
+    def head(self, r=None, pr=None, vtag=None):
+        """
+        Loads the metadata from Riak. When this operation completes, the
+        object could contain new metadata if the object was updated in Riak
+        since it was last retrieved. No Data will be fetched.
+
+        :param r: R-Value, wait for this many partitions to respond
+         before returning to client.
+        :type r: integer
+        :rtype: self
+        """
+        # Do the request...
+        r = self._bucket.get_r(r)
+        pr = self._bucket.get_pr(pr)
+        t = self._client.get_transport()
+        Result = yield t.head(self, r=r, pr=pr, vtag=vtag)
+
+        self.clear()
+        if Result is not None:
+            self.populate(Result)
+
+        defer.returnValue(self)
+
+    @defer.inlineCallbacks
     def delete(self, rw=None, r=None, w=None, dw=None, pr=None, pw=None):
         """
         Delete this object from Riak.
@@ -532,7 +556,8 @@ class RiakObject(object):
                 if not metadata.has_key(MD_INDEX):
                     metadata[MD_INDEX] = []
                 self.set_metadata(metadata)
-                self.set_encoded_data(data)
+                if data:        # needed for HEAD support
+                    self.set_encoded_data(data)
                 # Create objects for all siblings
                 siblings = [self]
                 for (metadata, data) in contents:

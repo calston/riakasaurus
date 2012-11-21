@@ -91,6 +91,20 @@ class Tests(unittest.TestCase):
         log.msg("done secondary_index")
 
     @defer.inlineCallbacks
+    def test_head(self):
+        """create a object, and retrieve metadata via head(), no content is loaded"""
+        log.msg("*** head")
+
+        obj = self.bucket.new("foo1", "test1")
+        yield obj.store()
+        
+        obj = yield self.bucket.head("foo1")
+        self.assertEqual(obj.exists(), True)
+        self.assertEqual(obj.get_data(), None)
+
+        log.msg("done head")
+
+    @defer.inlineCallbacks
     def test_set_data_empty(self):
         """Get an object that does not exist, then set_data and save it """
         log.msg("*** set_data_empty")
@@ -103,6 +117,7 @@ class Tests(unittest.TestCase):
         obj.set_data('bar1')
         yield obj.store()
 
+        
         self.assertEqual(obj.exists(), True)
         self.assertEqual(obj.get_data(), "bar1")
         log.msg("done set_data_empty")

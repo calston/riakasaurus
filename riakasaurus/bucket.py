@@ -318,6 +318,24 @@ class RiakBucket(object):
         pr = self.get_pr(pr)
         return obj.reload(r=r, pr=pr)
 
+    def head(self, key, r=None, pr=None):
+        """
+        Retrieve a JSON-encoded object from Riak.
+
+        :param key: Name of the key.
+        :type key: string
+        :param r: R-Value of the request (defaults to bucket's R)
+        :type r: integer
+        :param pr: PR-Value of the request (defaults to bucket's PR)
+        :type pr: integer
+        :rtype: :class:`RiakObject <riak.riak_object.RiakObject>`
+        """
+        obj = RiakObject(self._client, self, key)
+        obj._encode_data = True
+        r = self.get_r(r)
+        pr = self.get_pr(pr)
+        return obj.head(r=r, pr=pr)
+    
     def get_binary(self, key, r=None, pr=None):
         """
         Retrieve a binary/string object from Riak.
