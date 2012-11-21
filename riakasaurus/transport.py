@@ -303,7 +303,7 @@ class HTTPTransport(FeatureDetection):
         # If stats is disabled, we can't assume the Riak version
         # is >= 1.1. However, we can assume the new URL scheme is
         # at least version 1.0
-        elif 'riak_kv_wm_buckets' in self.get_resources():
+        elif 'riak_kv_wm_buckets' in (yield self.get_resources()):
             defer.returnValue("1.0.0")
         else:
             defer.returnValue("0.14.0")
@@ -315,7 +315,7 @@ class HTTPTransport(FeatureDetection):
         :rtype dict
         """
         response = yield self.http_request('GET', '/', {'Accept':'application/json'})
-        if response[0]['http_status'] is 200:
+        if response[0]['http_code'] is 200:
             defer.returnValue(self.decodeJson(response[1]))
         else:
             defer.returnValue({})
