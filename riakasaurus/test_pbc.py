@@ -33,6 +33,15 @@ class Tests(unittest.TestCase):
         res = yield self.client.ping()
         self.assertTrue(res)
         log.msg("done testing ping")
+
+    @defer.inlineCallbacks
+    def test_setgetClientId(self):
+        log.msg("*** testing getClientId")
+        yield self.client.setClientId('MyClientId')
+        res = yield self.client.getClientId()
+        self.assertEqual(res.client_id, 'MyClientId')
+        log.msg("done testing getClientId")
+        
         
     @defer.inlineCallbacks
     def test_put(self):
@@ -56,7 +65,7 @@ class Tests(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_update(self):
-        log.msg("*** testing get")
+        log.msg("*** testing update")
         # make sure "foo" is in
         put = yield self.client.put('bucket','key', 'foo')
         self.assertTrue(isinstance(put, RpbPutResp))
@@ -74,5 +83,5 @@ class Tests(unittest.TestCase):
         self.assertTrue(isinstance(result, RpbGetResp))
         self.assertEqual(result.content[0].value,'bla')
         
-        log.msg("done testing get")
+        log.msg("done testing update")
             
