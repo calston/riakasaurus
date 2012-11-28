@@ -40,12 +40,15 @@ MSG_CODE_INDEX_RESP = 26
 MSG_CODE_SEARCH_QUERY_REQ = 27
 MSG_CODE_SEARCH_QUERY_RESP = 28
 
-RiakResponses = {
-    MSG_CODE_ERROR_RESP : RpbErrorResp,
-    MSG_CODE_GET_CLIENT_ID_RESP : RpbGetClientIdResp,
-    MSG_CODE_GET_RESP : RpbGetResp,
-    MSG_CODE_PUT_RESP : RpbPutResp,
+riakResponses = {
+    MSG_CODE_ERROR_RESP           : RpbErrorResp,
+    MSG_CODE_GET_CLIENT_ID_RESP   : RpbGetClientIdResp,
+    MSG_CODE_GET_SERVER_INFO_RESP : RpbGetServerInfoResp,
+    MSG_CODE_GET_RESP             : RpbGetResp,
+    MSG_CODE_PUT_RESP             : RpbPutResp,
+    MSG_CODE_GET_SERVER_INFO_RESP : RpbGetServerInfoResp,
     }
+
 nonMessages = (MSG_CODE_PING_RESP,
                MSG_CODE_SET_CLIENT_ID_RESP)
 
@@ -96,11 +99,19 @@ class RiakPBC(Int32StringReceiver):
         code = pack('B',MSG_CODE_GET_CLIENT_ID_REQ)
         return self.__send(code)        
         
+    def getServerInfo(self):
+        code = pack('B',MSG_CODE_GET_SERVER_INFO_REQ)
+        return self.__send(code)        
         
     def ping(self):
         code = pack('B',MSG_CODE_PING_REQ)
         return self.__send(code)        
 
+    def getKeys(self, bucket):
+        code = pack('B',MSG_CODE_LIST_KEYS_REQ)
+        request = RpbList()
+        request.client_id = clientId
+    
         
     def get(self,bucket,key, **kwargs):
         code = pack('B',MSG_CODE_GET_REQ)
@@ -124,17 +135,42 @@ class RiakPBC(Int32StringReceiver):
         request = RpbPutReq()
         request.bucket = bucket
         request.key = key
-        request.content.value = content
+        if isinstance(content, str):
+            request.content.value = content
+        else:
+            # assume its a dict
+            request.content.value = content['value'] # mandatory
+            if content.get('content_type'): request.content.content_type = content['content_type']
+            if content.get('charset'): request.content.charset = content['charset']
+            if content.get('content_encoding'): request.content.content_encoding = content['content_encoding']
+            if content.get('vtag'): request.content.vtag = content['vtag']
+            if content.get('last_mod'): request.content.last_mod = content['last_mod']
+            if content.get('last_mod_usecs'): request.content.last_mod_usecs = content['last_mod_usecs']
+            if content.get('deleted'): request.content.deleted = content['deleted']
+            if content.get('links') and isinstance(content['links'], list):
+                for l in content['links']:
+                    link = request.content.links.add()
+                    link.bucket,link.key,link.tag = l
+
+        if kwargs.get('w')               : request.w = kwargs['w']
+        if kwargs.get('dw')              : request.dw = kwargs['dw']
+        if kwargs.get('return_body')     : request.return_body = kwargs['return_body']
+        if kwargs.get('pw')              : request.pw = kwargs['pw']
+        if kwargs.get('if_modified')     : request.if_modified = kwargs['if_modified']
+        if kwargs.get('if_not_modified') : request.if_not_modified = kwargs['if_not_modified']
+        if kwargs.get('if_none_match')   : request.if_none_match = kwargs['if_none_match']
+        if kwargs.get('return_head')     : request.return_head = kwargs['return_head']
+        
         if vclock:
             request.vclock = vclock
 
-        return self.__send( code + request.SerializeToString())        
+        return self.__send(code + request.SerializeToString())        
     
     def stringReceived(self, data):
         if self.debug:
             print "RiakPBC.stringReceived: ", toHex(data)
         code = unpack('B',data[:1])[0] # decode messagetype
-        if code not in RiakResponses and code not in nonMessages:
+        if code not in riakResponses and code not in nonMessages:
             raise RiakPBCException('unknown messagetype: %d' % code)
 
         if code in nonMessages:
@@ -142,7 +178,7 @@ class RiakPBC(Int32StringReceiver):
             self.factory.d.callback(True)
             return
 
-        response = RiakResponses[code]()
+        response = riakResponses[code]()
         if data[1:]:
             # if there's data, parse it, otherwise return empty object
             response.ParseFromString(data[1:])

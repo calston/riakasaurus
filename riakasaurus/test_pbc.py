@@ -8,6 +8,7 @@ from twisted.internet import defer, reactor
 from twisted.python import log
 from tx_riak_pb import RiakPBCClient
 from riak_kv_pb2 import *
+from riak_pb2 import *
 
 VERBOSE = False
 # uncomment to activate logging
@@ -41,7 +42,13 @@ class Tests(unittest.TestCase):
         res = yield self.client.getClientId()
         self.assertEqual(res.client_id, 'MyClientId')
         log.msg("done testing getClientId")
-        
+
+    @defer.inlineCallbacks
+    def test_getServerInfo(self):
+        log.msg("*** testing getServerInfo")
+        info = yield self.client.getServerInfo()
+        self.assertTrue(isinstance(info, RpbGetServerInfoResp))
+        log.msg("done testing getServerInfo")
         
     @defer.inlineCallbacks
     def test_put(self):
@@ -84,4 +91,29 @@ class Tests(unittest.TestCase):
         self.assertEqual(result.content[0].value,'bla')
         
         log.msg("done testing update")
-            
+
+
+    @defer.inlineCallbacks
+    def test_links(self):
+        log.msg("*** testing links")
+        # make sure "foo" is in
+        c = {'value' : 'foo',
+             'content_type' : 'text/text',
+             'content_encoding' : 'UTF8',
+             'links' : [
+                ('bucket', 'subkey', 'tag'),
+                ('bucket', 'nochnkey', ''),
+                ]
+             }
+        put = yield self.client.put('bucket','key', c)
+        self.assertTrue(isinstance(put, RpbPutResp))
+
+        # retrieve it
+        result = yield self.client.get('bucket','key')
+        self.assertTrue(isinstance(result, RpbGetResp))
+        self.assertEqual(result.content[0].value,'foo')
+        self.assertEqual(result.content[0].content_type,'text/text')
+        self.assertEqual(result.content[0].content_encoding,'UTF8')
+        self.assertTrue(len(result.content[0].links) == 2)
+        log.msg("done testing update")
+    
