@@ -50,6 +50,7 @@ riakResponses = {
     }
 
 nonMessages = (MSG_CODE_PING_RESP,
+               MSG_CODE_DEL_RESP,
                MSG_CODE_SET_CLIENT_ID_RESP)
 
 
@@ -147,6 +148,8 @@ class RiakPBC(Int32StringReceiver):
             if content.get('last_mod'): request.content.last_mod = content['last_mod']
             if content.get('last_mod_usecs'): request.content.last_mod_usecs = content['last_mod_usecs']
             if content.get('deleted'): request.content.deleted = content['deleted']
+
+            # write links if there are any
             if content.get('links') and isinstance(content['links'], list):
                 for l in content['links']:
                     link = request.content.links.add()
@@ -164,7 +167,24 @@ class RiakPBC(Int32StringReceiver):
         if vclock:
             request.vclock = vclock
 
-        return self.__send(code + request.SerializeToString())        
+        return self.__send(code + request.SerializeToString())
+
+    def delete(self,bucket,key, **kwargs):
+        code = pack('B',MSG_CODE_DEL_REQ)
+        request = RpbDelReq()
+        request.bucket = bucket
+        request.key = key
+
+        if kwargs.get('rw')     : request.rw = kwargs['rw']
+        if kwargs.get('vclock') : request.vclock = kwargs['vclock']
+        if kwargs.get('r')      : request.r = kwargs['r']
+        if kwargs.get('w')      : request.w = kwargs['w']
+        if kwargs.get('pr')     : request.pr = kwargs['pr']
+        if kwargs.get('pw')     : request.pw = kwargs['pw']
+        if kwargs.get('dw')     : request.dw = kwargs['dw']
+
+        return self.__send(code + request.SerializeToString())
+    
     
     def stringReceived(self, data):
         if self.debug:

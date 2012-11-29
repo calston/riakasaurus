@@ -94,26 +94,49 @@ class Tests(unittest.TestCase):
 
 
     @defer.inlineCallbacks
+    def test_delete(self):
+        log.msg("*** testing delete")
+
+        # make sure "foo" is in
+        put = yield self.client.put('bucket','delete_key', 'foo')
+        self.assertTrue(isinstance(put, RpbPutResp))
+
+        # remove it
+        result = yield self.client.delete('bucket','delete_key')
+        self.assertEqual(result,True)
+
+        # try to fetch it
+        result = yield self.client.get('bucket','delete_key')
+        self.assertTrue(isinstance(result, RpbGetResp))
+        self.assertEqual(len(result.content),0)
+        
+
+    @defer.inlineCallbacks
     def test_links(self):
         log.msg("*** testing links")
+
+        # retrieve it
+        head = yield self.client.get('bucket','key', head=True)
+        
         # make sure "foo" is in
-        c = {'value' : 'foo',
-             'content_type' : 'text/text',
-             'content_encoding' : 'UTF8',
-             'links' : [
-                ('bucket', 'subkey', 'tag'),
-                ('bucket', 'nochnkey', ''),
-                ]
-             }
-        put = yield self.client.put('bucket','key', c)
+        content = {'value' : 'foo',
+                   'content_type' : 'text/text',
+                   'content_encoding' : 'UTF8',
+                   'links' : [ ('bucket', 'subkey', 'tag'),
+                               ('bucket', 'nochnkey', ''),
+                               ]
+                   }
+        put = yield self.client.put('bucket','key', content, vclock = head.vclock)
         self.assertTrue(isinstance(put, RpbPutResp))
 
         # retrieve it
         result = yield self.client.get('bucket','key')
         self.assertTrue(isinstance(result, RpbGetResp))
+
         self.assertEqual(result.content[0].value,'foo')
         self.assertEqual(result.content[0].content_type,'text/text')
         self.assertEqual(result.content[0].content_encoding,'UTF8')
         self.assertTrue(len(result.content[0].links) == 2)
+
         log.msg("done testing update")
     
