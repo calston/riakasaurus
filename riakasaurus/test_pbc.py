@@ -109,7 +109,36 @@ class Tests(unittest.TestCase):
         result = yield self.client.get('bucket','delete_key')
         self.assertTrue(isinstance(result, RpbGetResp))
         self.assertEqual(len(result.content),0)
+        log.msg("done testing delete")
+
+
+    @defer.inlineCallbacks
+    def test_getKeys(self):
+        log.msg("*** testing getKeys")
+
+        # get existing keys
+        res = yield self.client.getKeys('bucket')
+        self.assertTrue(isinstance(res, list))
+
+        log.msg("done testing getKeys")
+
+
+    @defer.inlineCallbacks
+    def test_getBuckets(self):
+        log.msg("*** testing getBuckets")
+
+        # make sure "foo" is in
+        put = yield self.client.put('bucket','key', 'foo')
+        self.assertTrue(isinstance(put, RpbPutResp))
         
+        # get existing buckets message
+        res = yield self.client.getBuckets()
+        buckets = [b for b in res.buckets]
+        self.assertTrue('bucket' in buckets)
+
+        log.msg("done testing getBuckets")
+        
+
 
     @defer.inlineCallbacks
     def test_links(self):
@@ -138,5 +167,5 @@ class Tests(unittest.TestCase):
         self.assertEqual(result.content[0].content_encoding,'UTF8')
         self.assertTrue(len(result.content[0].links) == 2)
 
-        log.msg("done testing update")
+        log.msg("done testing links")
     

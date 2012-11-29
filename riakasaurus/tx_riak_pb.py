@@ -40,23 +40,8 @@ MSG_CODE_INDEX_RESP = 26
 MSG_CODE_SEARCH_QUERY_REQ = 27
 MSG_CODE_SEARCH_QUERY_RESP = 28
 
-riakResponses = {
-    MSG_CODE_ERROR_RESP           : RpbErrorResp,
-    MSG_CODE_GET_CLIENT_ID_RESP   : RpbGetClientIdResp,
-    MSG_CODE_GET_SERVER_INFO_RESP : RpbGetServerInfoResp,
-    MSG_CODE_GET_RESP             : RpbGetResp,
-    MSG_CODE_PUT_RESP             : RpbPutResp,
-    MSG_CODE_GET_SERVER_INFO_RESP : RpbGetServerInfoResp,
-    }
-
-nonMessages = (MSG_CODE_PING_RESP,
-               MSG_CODE_DEL_RESP,
-               MSG_CODE_SET_CLIENT_ID_RESP)
-
-
 class RiakPBCException(Exception):
     pass
-
 
 def toHex(s):
     lst = []
@@ -70,26 +55,26 @@ def toHex(s):
 
 class RiakPBC(Int32StringReceiver):
 
+    riakResponses = {
+        MSG_CODE_ERROR_RESP           : RpbErrorResp,
+        MSG_CODE_GET_CLIENT_ID_RESP   : RpbGetClientIdResp,
+        MSG_CODE_GET_SERVER_INFO_RESP : RpbGetServerInfoResp,
+        MSG_CODE_GET_RESP             : RpbGetResp,
+        MSG_CODE_PUT_RESP             : RpbPutResp,
+        MSG_CODE_LIST_KEYS_RESP       : RpbListKeysResp,
+        MSG_CODE_LIST_BUCKETS_RESP    : RpbListBucketsResp,
+        MSG_CODE_GET_SERVER_INFO_RESP : RpbGetServerInfoResp,
+        }
+
+    nonMessages = (MSG_CODE_PING_RESP,
+                   MSG_CODE_DEL_RESP,
+                   MSG_CODE_SET_CLIENT_ID_RESP)
+    
     debug = 0
 
-
-    def connectionMade(self):
-        """
-        return the protocol instance to the factory so it
-        can be used directly
-        """
-        self.factory.connected.callback(self)
-
-    def __send(self, msg):
-        """
-        helper method for logging, sending and returning the deferred
-        """
-        if self.debug:
-            print "[%s] %s" % (self.__class__.__name__, toHex(msg))
-        self.sendString(msg)
-        self.factory.d = Deferred()
-        return self.factory.d
-        
+    # ------------------------------------------------------------------
+    # Server Operations .. setClientId, getClientId, getServerInfo, ping
+    # ------------------------------------------------------------------
     def setClientId(self,clientId):
         code = pack('B',MSG_CODE_SET_CLIENT_ID_REQ)
         request = RpbSetClientIdReq()
@@ -108,12 +93,9 @@ class RiakPBC(Int32StringReceiver):
         code = pack('B',MSG_CODE_PING_REQ)
         return self.__send(code)        
 
-    def getKeys(self, bucket):
-        code = pack('B',MSG_CODE_LIST_KEYS_REQ)
-        request = RpbList()
-        request.client_id = clientId
-    
-        
+    # ------------------------------------------------------------------
+    # Object/Key Operations .. get(fetch), put(store), delete
+    # ------------------------------------------------------------------
     def get(self,bucket,key, **kwargs):
         code = pack('B',MSG_CODE_GET_REQ)
         request = RpbGetReq()
@@ -184,28 +166,97 @@ class RiakPBC(Int32StringReceiver):
         if kwargs.get('dw')     : request.dw = kwargs['dw']
 
         return self.__send(code + request.SerializeToString())
+
     
+    # ------------------------------------------------------------------
+    # Bucket Operations .. getKeys, getBuckets, get/set Bucket properties
+    # ------------------------------------------------------------------
+    def getKeys(self, bucket):
+        """
+        operates different than the other messages, as it returns more than
+        one respone .. see stringReceived() for handling
+        """
+        code = pack('B',MSG_CODE_LIST_KEYS_REQ)
+        request = RpbListKeysReq()
+        request.bucket = bucket
+        self.__keyList = []
+        return self.__send(code + request.SerializeToString())
+
+    def getBuckets(self):
+        """
+        operates different than the other messages, as it returns more than
+        one respone .. see stringReceived() for handling
+        """
+        code = pack('B',MSG_CODE_LIST_BUCKETS_REQ)
+        return self.__send(code)
+
+    
+    # ------------------------------------------------------------------
+    # helper functions, message parser
+    # ------------------------------------------------------------------
+    def connectionMade(self):
+        """
+        return the protocol instance to the factory so it
+        can be used directly
+        """
+        self.factory.connected.callback(self)
+
+    def __send(self, msg):
+        """
+        helper method for logging, sending and returning the deferred
+        """
+        if self.debug:
+            print "[%s] %s" % (self.__class__.__name__, toHex(msg))
+        self.sendString(msg)
+        self.factory.d = Deferred()
+        return self.factory.d
     
     def stringReceived(self, data):
+        """
+        messages contain as first byte a message type code that is used
+        to map to the correct message type in self.riakResponses
+
+        messages that dont have a body to parse return True, those are
+        listed in self.nonMessages
+        """
         if self.debug:
             print "RiakPBC.stringReceived: ", toHex(data)
-        code = unpack('B',data[:1])[0] # decode messagetype
-        if code not in riakResponses and code not in nonMessages:
+        # decode messagetype
+        code = unpack('B',data[:1])[0]
+        
+        if code not in self.riakResponses and code not in self.nonMessages:
             raise RiakPBCException('unknown messagetype: %d' % code)
 
-        if code in nonMessages:
-            # for instance ping doesnt have a message
+        elif code in self.nonMessages:
+            # for instance ping doesnt have a message, so we just return True
             self.factory.d.callback(True)
             return
 
-        response = riakResponses[code]()
-        if data[1:]:
-            # if there's data, parse it, otherwise return empty object
+        elif code == MSG_CODE_LIST_KEYS_RESP:
+            # listKeys is special as it returns multiple response messages
+            # each message can contain multiple keys
+            # the last message contains a optional field "done"
+            # so collect all the messages until the last one, then call the
+            # callback
+            response = RpbListKeysResp()
             response.ParseFromString(data[1:])
-            if code == MSG_CODE_ERROR_RESP:
-                raise RiakPBCException('%s (%d)' % (response.errmsg, response.errcode))
             
-        self.factory.d.callback(response)
+            self.__keyList.extend([x for x in response.keys])
+            if response.HasField('done') and response.done:
+                self.factory.d.callback(self.__keyList)
+                self.__keyList = []
+
+        else:
+            # normal handling, pick the message code, call ParseFromString()
+            # on it, and return the message
+            response = self.riakResponses[code]()
+            if data[1:]:
+                # if there's data, parse it, otherwise return empty object
+                response.ParseFromString(data[1:])
+                if code == MSG_CODE_ERROR_RESP:
+                    raise RiakPBCException('%s (%d)' % (response.errmsg, response.errcode))
+
+            self.factory.d.callback(response)
 
     def quit(self):
         self.transport.loseConnection()
