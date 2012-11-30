@@ -6,6 +6,7 @@ LineReceiver.MAX_LENGTH = 1024*1024*64
 from twisted.internet import defer, reactor, protocol
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IBodyProducer
+from twisted.python import log
 
 from distutils.version import StrictVersion
 
@@ -46,6 +47,11 @@ class ITransport(Interface):
     def put(self, robj, w = None, dw = None, pw = None, return_body = True, if_none_match=False):
         """
         store a riak_object
+        """
+
+    def get(self, robj, r = None, pr = None, vtag = None):
+        """
+        fetch a key from the server
         """
 
 class FeatureDetection(object):
@@ -602,7 +608,7 @@ class HTTPTransport(FeatureDetection):
             elif header == 'charset':
                 metadata[MD_CHARSET] = value
             elif header == 'content-encoding':
-                metadata[MD_CTYPE] = value
+                metadata[MD_ENCODING] = value
             elif header == 'etag':
                 metadata[MD_VTAG] = value
             elif header =='link':
@@ -895,6 +901,9 @@ class StatefulTransport(object):
 class PBCTransport(FeatureDetection):
     """ Protocoll buffer transport for Riak """
 
+    implements(ITransport)
+
+    
     debug = 1
     __MAX_TRANSPORTS = 1000
     
@@ -944,15 +953,36 @@ class PBCTransport(FeatureDetection):
 
     @defer.inlineCallbacks
     def put(self, robj, w = None, dw = None, pw = None, return_body = True, if_none_match=False):
+        # std kwargs
+        kwargs = {'w'             : w,
+                  'dw'            : dw,
+                  'pw'            : pw,
+                  'return_body'   : return_body,
+                  'if_none_match' : if_none_match
+                  }
+        # vclock
+        if robj.vclock(): kwargs['vclock'] = robj.vclock()
+
+        # links
+        links = robj.get_links()
+        if links:
+            kwargs['links'] = []
+            for l in links:
+                kwargs['links'].append((l.get_bucket.get_name(), l.get_key(), l.get_tag()))
+
+        # usermeta
+        if robj.get_usermeta():
+            kwargs['usermeta'] = []
+            for key, value in robj.get_usermeta().iteritems():
+                kwargs['usermeta'].append((key, value))
+                
+        # aquire transport, fire, release
         (idx, transport) = yield self._getFreeTransport()
         ret = yield transport.put(robj.get_bucket().get_name(),
-                                       robj.get_key(),
-                                       robj.get_encoded_data(),
-                                       w = w,
-                                       dw = dw,
-                                       pw = pw,
-                                       return_body = return_body,
-                                       if_none_match = if_none_match)
+                                  robj.get_key(),
+                                  robj.get_encoded_data(),
+                                  **kwargs
+                                  )
         yield self._releaseTransport(idx)
         if return_body:
             defer.returnValue([x.value for x in ret.content])
@@ -960,15 +990,57 @@ class PBCTransport(FeatureDetection):
             defer.returnValue(None)
 
     @defer.inlineCallbacks
-    def waitForTransport(self):
-        for i in xrange(50):
-            x = yield self.deferred_sleep(0.1)
-            if self.debug:
-                print "[%s] sleeping 0.1s, waiting for connect, %s" % (
-                    self.__class__.__name__, self.transport)
-            if self.transport is not None:
-                defer.returnValue(True)
-        raise Exception("unable to connect to %s:%d, abort" % (self.host, self.port))
+    def get(self, robj, r = None, pr = None, vtag = None):
+
+        # ***FIXME*** whats vtag for? ignored for now
+        (idx, transport) = yield self._getFreeTransport()
+        ret = yield transport.get(robj.get_bucket().get_name(),
+                                  robj.get_key(),
+                                  r = r,
+                                  pr = pr)
+
+        yield self._releaseTransport(idx)
+        defer.returnValue(self.parseRpbGetResp(ret))
+
+
+    def parseRpbGetResp(self,res):
+        """
+        adaptor for a RpbGetResp message
+        message RpbGetResp {
+           repeated RpbContent content = 1;
+           optional bytes vclock = 2;
+           optional bool unchanged = 3;
+        }
+        
+        """
+        vclock = res.vclock
+        resList = []
+        for content in res.content: # iterate over RpbContent field
+            metadata = {MD_USERMETA: {}, MD_INDEX: []}
+            data = content.value
+            if content.HasField('content_type'): metadata[MD_CTYPE] = content.content_type
+            if content.HasField('charset'): metadata[MD_CHARSET] = content.charset
+            if content.HasField('content_encoding'): metadata[MD_ENCODING] = content.content_encoding
+            if content.HasField('vtag'): metadata[MD_VTAG] = content.vtag
+            if content.HasField('last_mod'): metadata[MD_LASTMOD] = content.last_mod
+            if content.HasField('deleted'): metadata[MD_DELETED] = content.deleted
+
+            if len(content.links):
+                metadata[MD_LINKS] = []
+                for link in content.links:
+                    metadata[MD_LINKS].append(RiakLink(l.bucket,l.key,l.tag))
+
+            if len(content.usermeta):
+                metadata[MD_USERMETA] = {}
+                for md in content.usermeta:
+                    metadata[MD_USERMETA][md.key] = md.value
+                    
+            if len(content.indexes):
+                metadata[MD_INDEX] = []
+                for ie in content.indexes:
+                    metadata[MD_INDEX].append(RiakIndexEntry(ie.key, ie.value))
+            resList.append((metadata, data))
+        return vclock, resList
         
     def decodeJson(self, s):
         return self.client.get_decoder('application/json')(s)
@@ -976,13 +1048,13 @@ class PBCTransport(FeatureDetection):
     def encodeJson(self, s):
         return self.client.get_encoder('application/json')(s)
         
-    def deferred_sleep(self,secs):
-        """
-        fake deferred sleep
+    # def deferred_sleep(self,secs):
+    #     """
+    #     fake deferred sleep
         
-        @param secs: time to sleep
-        @type secs: float
-        """
-        d = defer.Deferred()
-        reactor.callLater(secs, d.callback, None)
-        return d
+    #     @param secs: time to sleep
+    #     @type secs: float
+    #     """
+    #     d = defer.Deferred()
+    #     reactor.callLater(secs, d.callback, None)
+    #     return d

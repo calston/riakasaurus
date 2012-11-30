@@ -146,6 +146,18 @@ class RiakPBC(Int32StringReceiver):
                     link = request.content.links.add()
                     link.bucket,link.key,link.tag = l
 
+            # usermeta
+            if content.get('usermeta') and isinstance(content['usermeta'], list):
+                for l in content['usermeta']:
+                    usermeta = request.content.usermeta.add()
+                    usermeta.key,usermeta.value = l
+
+            # indexes
+            if content.get('indexes') and isinstance(content['indexes'], list):
+                for l in content['indexes']:
+                    indexes = request.content.indexes.add()
+                    indexes.key,indexes.value = l
+
         if kwargs.get('w')               : request.w = self._resolveNums(kwargs['w'])
         if kwargs.get('dw')              : request.dw = self._resolveNums(kwargs['dw'])
         if kwargs.get('return_body')     : request.return_body = kwargs['return_body']
