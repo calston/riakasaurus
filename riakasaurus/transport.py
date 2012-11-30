@@ -640,12 +640,12 @@ class HTTPTransport(FeatureDetection):
 
     def add_links_for_riak_object(self, robject, headers):
         links = robject.get_links()
+        link_headers = []
         if links:
             current_header = ''
             for link in links:
                 header = self.to_link_header(link)
                 if len(current_header + header) > MAX_LINK_HEADER_SIZE:
-                    headers.add('Link', current_header)
                     current_header = ''
 
                 if current_header != '': header = ', ' + header
