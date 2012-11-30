@@ -1,3 +1,4 @@
+from riakasaurus.transport import HTTPTransport
 from xml.etree import ElementTree
 from xml.dom.minidom import Document
 
@@ -5,13 +6,18 @@ from xml.dom.minidom import Document
 class RiakSearch(object):
     def __init__(self, client, transport_class=None,
                  host="127.0.0.1", port=8098):
+        if transport_class is None:
+            transport_class = HTTPTransport
+
+        hostports = [(host, port), ]
+        self._transport = transport_class(client, prefix="/solr")
+
         self._client = client
-        self._host = host
-        self._port = port
         self._decoders = {"text/xml": ElementTree.fromstring}
 
     def get_decoder(self, content_type):
-        decoder = self._client.get_decoder(content_type) or self._decoders.get(content_type)
+        decoder = (self._client.get_decoder(content_type)
+                   or self._decoders[content_type])
         if not decoder:
             decoder = self.decode
 
@@ -19,15 +25,6 @@ class RiakSearch(object):
 
     def decode(self, data):
         return data
-
-    def _do_xml_request(self, url, xml):
-        headers = {'Accept': 'text/xml, */*; q=0.5',
-                   'Content-Type': 'text/xml',
-                   }
-        d = util.http_request_deferred('POST', self._host, self._port, url,
-                                       headers, xml.toxml())
-        d.addCallback(lambda response: response[0]['http_code'] == 200)
-        return d
 
     def add(self, index, *docs):
         xml = Document()
@@ -42,7 +39,10 @@ class RiakSearch(object):
                 doc_element.appendChild(field)
             root.appendChild(doc_element)
         xml.appendChild(root)
-        return self._do_xml_request("/solr/%s/update" % index, xml)
+
+        url = "/solr/%s/update" % index
+        self._transport.post_request(uri=url, body=xml.toxml(),
+                                     content_type="text/xml")
 
     index = add
 
@@ -63,24 +63,15 @@ class RiakSearch(object):
                 root.appendChild(query_element)
 
         xml.appendChild(root)
-        return self._do_xml_request("/solr/%s/update" % index, xml)
+
+        url = "/solr/%s/update" % index
+        self._transport.post_request(uri=url, body=xml.toxml(),
+                                     content_type="text/xml")
 
     remove = delete
 
     def search(self, index, query, **params):
-        options = {'q': query, 'wt': 'json'}
-        options.update(params)
-
-        def decode_results(response):
-            headers, data = response
-            decoder = self.get_decoder(headers['content-type'])
-            return decoder(data)
-
-        url = "/solr/%s/select" % index
-        host, port, url = util.build_rest_path(self._client, prefix=url,
-                                               params=options)
-        d = util.http_request_deferred('GET', host, port, url)
-        d.addCallback(decode_results)
-        return d
+        return self._client.transport.search(index, query, **params)
 
     select = search
+

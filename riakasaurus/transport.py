@@ -153,8 +153,11 @@ class StringProducer(object):
 
 class HTTPTransport(FeatureDetection):
     """ HTTP Transport for Riak """
-    def __init__(self, client):
-        self._prefix = client._prefix
+    def __init__(self, client, prefix=None):
+        if prefix:
+            self._prefix = prefix
+        else:
+            self._prefix = client._prefix
         self.host = client._host
         self.port = client._port
         self.client = client
