@@ -1,8 +1,6 @@
 from xml.etree import ElementTree
 from xml.dom.minidom import Document
 
-from riakasaurus import util
-
 
 class RiakSearch(object):
     def __init__(self, client, transport_class=None,

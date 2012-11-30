@@ -186,7 +186,7 @@ class HTTPTransport(FeatureDetection):
                 h[k.lower()] = v
 
         if not 'content-type' in h.keys():
-            h['content-type'] = ['application/json'] 
+            h['content-type'] = ['application/json']
 
         if body:
             bodyProducer = StringProducer(body)
@@ -352,6 +352,7 @@ class HTTPTransport(FeatureDetection):
             params['vtag'] = vtag
         url = self.build_rest_path(robj.get_bucket(), robj.get_key(),
                                    params=params)
+
         response = yield self.http_request('HEAD', url)
         defer.returnValue(
             self.parse_body(response, [200, 300, 404])
@@ -368,6 +369,7 @@ class HTTPTransport(FeatureDetection):
         url = self.build_rest_path(bucket=robj.get_bucket(), key=robj.get_key(),
                                    params=params)
         headers = self.build_put_headers(robj)
+
         # TODO: use a more general 'prevent_stale_writes' semantics,
         # which is a superset of the if_none_match semantics.
         if if_none_match:
