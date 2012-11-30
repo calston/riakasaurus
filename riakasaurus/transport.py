@@ -1,4 +1,4 @@
-from zope.interface import implements
+from zope.interface import implements, Interface
 
 from twisted.protocols.basic import LineReceiver
 LineReceiver.MAX_LENGTH = 1024*1024*64
@@ -11,6 +11,7 @@ from distutils.version import StrictVersion
 
 import urllib
 import re, csv
+import time
 from cStringIO import StringIO
 
 from xml.etree import ElementTree
@@ -22,6 +23,11 @@ from riakasaurus.util import Agent
 from riakasaurus.riak_index_entry import RiakIndexEntry
 from riakasaurus.mapreduce import RiakLink
 
+# protobuf
+from tx_riak_pb import RiakPBCClient
+from riak_kv_pb2 import *
+from riak_pb2 import *
+
 MAX_LINK_HEADER_SIZE = 8192 - 8
 
 versions = {
@@ -30,6 +36,17 @@ versions = {
     1.2: StrictVersion("1.2.0")
     }
 
+
+class ITransport(Interface):
+    def get_keys(self, bucket):
+        """
+        list keys for a given bucket
+        """
+        
+    def put(self, robj, w = None, dw = None, pw = None, return_body = True, if_none_match=False):
+        """
+        store a riak_object
+        """
 
 class FeatureDetection(object):
     _s_version = None
@@ -849,5 +866,123 @@ class XMLSearchResult(object):
                 'max_score':self.max_score,
                 'docs': self.docs }
 
+class StatefulTransport(object):
+
+    def __init__(self,transport):
+        self.__transport = transport
+        self.__state = 'idle'
+        self.__age   = time.time()
+
+    def __repr__(self):
+        return '<StatefulTransport age=%.2fs state=\'%s\' transport=%s>' % (time.time() - self.__age, self.__state, self.__transport)
+
+    def isActive(self):
+        return self.__state == 'active'
+
+    def setActive(self):
+        self.__state = 'active'
+
+    def isIdle(self):
+        return self.__state == 'idle'
+
+    def setIdle(self):
+        self.__state = 'idle'
+
+    def getTransport(self):
+        return self.__transport
+        
+
+class PBCTransport(FeatureDetection):
+    """ Protocoll buffer transport for Riak """
+
+    debug = 1
+    __MAX_TRANSPORTS = 1000
+    
+    def __init__(self, client):
+        self._prefix = client._prefix
+        self.host = client._host
+        self.port = client._port
+        self.client = client
+        self._client_id = None
+        self._transports = []    # list of transports, empty on start
 
 
+    @defer.inlineCallbacks
+    def _getFreeTransport(self):
+        foundOne = False
+        for idx,stp in enumerate(self._transports):
+            if stp.isIdle():
+                stp.setActive()
+                foundOne = True
+                if self.debug:
+                    print "[%s] aquired idle transport %d: %s" % (self.__class__.__name__, idx,stp)
+                defer.returnValue((idx,stp.getTransport()))
+        if not foundOne:
+            if len(self._transports) > self.__MAX_TRANSPORTS:
+                raise Exception("to many transports, aborting")
+
+            # nothin free, create a new protocol instance, append
+            # it to self._transports and return it
+            transport = yield RiakPBCClient().connect(self.host, self.port)
+            stp = StatefulTransport(transport)
+            idx = len(self._transports)
+            self._transports.append(stp)
+            stp.setActive()
+            if self.debug:
+                print "[%s] allocate new transport %d: %s" % (self.__class__.__name__, idx,stp)
+            defer.returnValue((idx,stp.getTransport()))
+
+    def _releaseTransport(self,idx):
+        if self.debug:
+            print "[%s] idle transport %d" % (self.__class__.__name__, idx)
+        self._transports[idx].setIdle()
+
+    def __del__(self):
+        """on shutdown, close all transports"""
+        for stl in self._transports:
+            stl.getTransport().quit()
+
+    @defer.inlineCallbacks
+    def put(self, robj, w = None, dw = None, pw = None, return_body = True, if_none_match=False):
+        (idx, transport) = yield self._getFreeTransport()
+        ret = yield transport.put(robj.get_bucket().get_name(),
+                                       robj.get_key(),
+                                       robj.get_encoded_data(),
+                                       w = w,
+                                       dw = dw,
+                                       pw = pw,
+                                       return_body = return_body,
+                                       if_none_match = if_none_match)
+        yield self._releaseTransport(idx)
+        if return_body:
+            defer.returnValue([x.value for x in ret.content])
+        else:
+            defer.returnValue(None)
+
+    @defer.inlineCallbacks
+    def waitForTransport(self):
+        for i in xrange(50):
+            x = yield self.deferred_sleep(0.1)
+            if self.debug:
+                print "[%s] sleeping 0.1s, waiting for connect, %s" % (
+                    self.__class__.__name__, self.transport)
+            if self.transport is not None:
+                defer.returnValue(True)
+        raise Exception("unable to connect to %s:%d, abort" % (self.host, self.port))
+        
+    def decodeJson(self, s):
+        return self.client.get_decoder('application/json')(s)
+
+    def encodeJson(self, s):
+        return self.client.get_encoder('application/json')(s)
+        
+    def deferred_sleep(self,secs):
+        """
+        fake deferred sleep
+        
+        @param secs: time to sleep
+        @type secs: float
+        """
+        d = defer.Deferred()
+        reactor.callLater(secs, d.callback, None)
+        return d
