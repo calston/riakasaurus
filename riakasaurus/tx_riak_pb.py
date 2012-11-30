@@ -63,12 +63,21 @@ class RiakPBC(Int32StringReceiver):
         MSG_CODE_PUT_RESP             : RpbPutResp,
         MSG_CODE_LIST_KEYS_RESP       : RpbListKeysResp,
         MSG_CODE_LIST_BUCKETS_RESP    : RpbListBucketsResp,
+        MSG_CODE_GET_BUCKET_RESP      : RpbGetBucketResp,
         MSG_CODE_GET_SERVER_INFO_RESP : RpbGetServerInfoResp,
         }
 
     nonMessages = (MSG_CODE_PING_RESP,
                    MSG_CODE_DEL_RESP,
+                   MSG_CODE_SET_BUCKET_RESP,
                    MSG_CODE_SET_CLIENT_ID_RESP)
+
+    rwNums = {
+        'one'     : 4294967295-1,
+        'quorum'  : 4294967295-2,
+        'all'     : 4294967295-3,
+        'default' : 4294967295-4,
+        }
     
     debug = 0
 
@@ -102,8 +111,8 @@ class RiakPBC(Int32StringReceiver):
         request.bucket = bucket
         request.key = key
 
-        if kwargs.get('r')            : request.r = kwargs['r']
-        if kwargs.get('pr')           : request.pr = kwargs['pr']
+        if kwargs.get('r')            : request.r = self._resolveNums(kwargs['r'])
+        if kwargs.get('pr')           : request.pr = self._resolveNums(kwargs['pr'])
         if kwargs.get('basic_quorum') : request.basic_quorum = kwargs['basic_quorum']
         if kwargs.get('notfound_ok')  : request.notfound_ok = kwargs['notfound_ok']
         if kwargs.get('if_modified')  : request.if_modified = kwargs['if_modified']
@@ -137,10 +146,10 @@ class RiakPBC(Int32StringReceiver):
                     link = request.content.links.add()
                     link.bucket,link.key,link.tag = l
 
-        if kwargs.get('w')               : request.w = kwargs['w']
-        if kwargs.get('dw')              : request.dw = kwargs['dw']
+        if kwargs.get('w')               : request.w = self._resolveNums(kwargs['w'])
+        if kwargs.get('dw')              : request.dw = self._resolveNums(kwargs['dw'])
         if kwargs.get('return_body')     : request.return_body = kwargs['return_body']
-        if kwargs.get('pw')              : request.pw = kwargs['pw']
+        if kwargs.get('pw')              : request.pw = self._resolveNums(kwargs['pw'])
         if kwargs.get('if_modified')     : request.if_modified = kwargs['if_modified']
         if kwargs.get('if_not_modified') : request.if_not_modified = kwargs['if_not_modified']
         if kwargs.get('if_none_match')   : request.if_none_match = kwargs['if_none_match']
@@ -189,6 +198,23 @@ class RiakPBC(Int32StringReceiver):
         """
         code = pack('B',MSG_CODE_LIST_BUCKETS_REQ)
         return self.__send(code)
+
+    def getBucketProperties(self, bucket):
+        code = pack('B',MSG_CODE_GET_BUCKET_REQ)
+        request = RpbGetBucketReq()
+        request.bucket = bucket
+        return self.__send(code + request.SerializeToString())
+    
+    def setBucketProperties(self, bucket, **kwargs):
+        code = pack('B',MSG_CODE_SET_BUCKET_REQ)
+        request = RpbSetBucketReq()
+        request.bucket = bucket
+
+        if kwargs.get('n_val')      : request.props.n_val = kwargs['n_val']
+        if kwargs.get('allow_mult') : request.props.allow_mult = kwargs['allow_mult']
+        
+        return self.__send(code + request.SerializeToString())
+    
 
     
     # ------------------------------------------------------------------
@@ -257,6 +283,17 @@ class RiakPBC(Int32StringReceiver):
                     raise RiakPBCException('%s (%d)' % (response.errmsg, response.errcode))
 
             self.factory.d.callback(response)
+
+    def _resolveNums(self,val):
+        if isinstance(val, str):
+            val = val.lower()
+            if val in self.rwNums:
+                return self.rwNums[val]
+            else:
+                raise RiakPBCException('invalid value %s' % (val))
+        else:
+            return val
+            
 
     def quit(self):
         self.transport.loseConnection()
