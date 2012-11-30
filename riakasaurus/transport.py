@@ -17,7 +17,8 @@ from xml.etree import ElementTree
 
 # MD_ resources
 from riakasaurus.metadata import *
-from riakasaurus.util import Agent
+from twisted.web.client import Agent
+
 
 from riakasaurus.riak_index_entry import RiakIndexEntry
 from riakasaurus.mapreduce import RiakLink
@@ -180,9 +181,12 @@ class HTTPTransport(FeatureDetection):
         h = {}
         for k, v in headers.items():
             if not isinstance(v, list):
-                h[k] = [v]
+                h[k.lower()] = [v]
             else:
-                h[k] = v
+                h[k.lower()] = v
+
+        if not 'content-type' in h.keys():
+            h['content-type'] = ['application/json'] 
 
         if body:
             bodyProducer = StringProducer(body)

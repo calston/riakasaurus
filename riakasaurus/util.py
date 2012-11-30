@@ -48,8 +48,6 @@ else:
                            contextFactory=None,
                            connectTimeout=240,
                            pool=None):
-            if pool is None:
-                pool = QuietHTTPConnectionPool(reactor, False)
             client._AgentBase.__init__(self, reactor,
                 contextFactory=contextFactory, pool=pool)
             self.connectTimeout = connectTimeout
