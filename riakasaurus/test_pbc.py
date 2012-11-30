@@ -135,10 +135,28 @@ class Tests(unittest.TestCase):
         res = yield self.client.getBuckets()
         buckets = [b for b in res.buckets]
         self.assertTrue('bucket' in buckets)
-
         log.msg("done testing getBuckets")
-        
 
+
+    @defer.inlineCallbacks
+    def test_setGetBucketProperties(self):
+        log.msg("*** testing setGetBucketProperties")
+
+        # make sure "foo" is in
+        put = yield self.client.put('anotherbucket','key', 'foo')
+        self.assertTrue(isinstance(put, RpbPutResp))
+        
+        # get existing buckets message
+        res = yield self.client.setBucketProperties('anotherbucket', n_val=2, allow_mult = True)
+        self.assertTrue(isinstance(res, RpbSetBucketResp))
+
+        res = yield self.client.getBucketProperties('anotherbucket')
+        self.assertEqual(res.props.n_val,2))
+
+        yield self.client.delete('anotherbucket','key')
+        
+        log.msg("done testing setGetBucketProperties")
+        
 
     @defer.inlineCallbacks
     def test_links(self):
