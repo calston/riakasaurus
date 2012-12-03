@@ -144,7 +144,6 @@ class RiakPBC(Int32StringReceiver):
             if content.get('deleted'): request.content.deleted = content['deleted']
 
             # write links if there are any
-            print isinstance(content['links'], list)
             if content.get('links') and isinstance(content['links'], list):
                 for l in content['links']:
                     link = request.content.links.add()
