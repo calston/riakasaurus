@@ -5,6 +5,8 @@ from twisted.internet import reactor
 
 from struct import pack, unpack
 
+from pprint import pformat
+
 # generated code from *.proto message definitions
 from riak_kv_pb2 import *       
 from riak_pb2 import *
@@ -127,6 +129,7 @@ class RiakPBC(Int32StringReceiver):
         request = RpbPutReq()
         request.bucket = bucket
         request.key = key
+        
         if isinstance(content, str):
             request.content.value = content
         else:
@@ -141,6 +144,7 @@ class RiakPBC(Int32StringReceiver):
             if content.get('deleted'): request.content.deleted = content['deleted']
 
             # write links if there are any
+            print isinstance(content['links'], list)
             if content.get('links') and isinstance(content['links'], list):
                 for l in content['links']:
                     link = request.content.links.add()
@@ -178,13 +182,13 @@ class RiakPBC(Int32StringReceiver):
         request.bucket = bucket
         request.key = key
 
-        if kwargs.get('rw')     : request.rw = kwargs['rw']
+        if kwargs.get('rw')     : request.rw = self._resolveNums(kwargs['rw'])
         if kwargs.get('vclock') : request.vclock = kwargs['vclock']
-        if kwargs.get('r')      : request.r = kwargs['r']
-        if kwargs.get('w')      : request.w = kwargs['w']
-        if kwargs.get('pr')     : request.pr = kwargs['pr']
-        if kwargs.get('pw')     : request.pw = kwargs['pw']
-        if kwargs.get('dw')     : request.dw = kwargs['dw']
+        if kwargs.get('r')      : request.r = self._resolveNums(kwargs['r'])
+        if kwargs.get('w')      : request.w = self._resolveNums(kwargs['w'])
+        if kwargs.get('pr')     : request.pr = self._resolveNums(kwargs['pr'])
+        if kwargs.get('pw')     : request.pw = self._resolveNums(kwargs['pw'])
+        if kwargs.get('dw')     : request.dw = self._resolveNums(kwargs['dw'])
 
         return self.__send(code + request.SerializeToString())
 
@@ -288,6 +292,11 @@ class RiakPBC(Int32StringReceiver):
             # normal handling, pick the message code, call ParseFromString()
             # on it, and return the message
             response = self.riakResponses[code]()
+            if self.debug:
+                print "-- RiakPBC.stringReceived --", code
+                print response
+                print "** RiakPBC.stringReceived **"
+                
             if data[1:]:
                 # if there's data, parse it, otherwise return empty object
                 response.ParseFromString(data[1:])

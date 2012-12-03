@@ -54,6 +54,23 @@ class ITransport(Interface):
         fetch a key from the server
         """
 
+    def delete(self, robj, rw=None, r = None, w = None, dw = None, pr = None, pw = None):
+        """
+        delete a key from the bucket
+        """
+        
+    def server_version(self):
+        """
+        return cached server version 
+        """
+    def _server_version(self):
+        """
+        Gets the server version from the server. To be implemented by
+        the individual transport class.
+        :rtype string
+        """
+
+        
 class FeatureDetection(object):
     _s_version = None
 
@@ -961,26 +978,35 @@ class PBCTransport(FeatureDetection):
                   'if_none_match' : if_none_match
                   }
         # vclock
-        if robj.vclock(): kwargs['vclock'] = robj.vclock()
+        
+        vclock = robj.vclock() or None
 
+
+        payload = {
+            'value' : robj.get_encoded_data(),
+            'content_type' : robj.get_content_type(),
+            }
+        
         # links
         links = robj.get_links()
         if links:
-            kwargs['links'] = []
+            payload['links'] = []
             for l in links:
-                kwargs['links'].append((l.get_bucket.get_name(), l.get_key(), l.get_tag()))
+                payload['links'].append((l.get_bucket(), l.get_key(), l.get_tag()))
 
         # usermeta
         if robj.get_usermeta():
-            kwargs['usermeta'] = []
+            payload['usermeta'] = []
             for key, value in robj.get_usermeta().iteritems():
-                kwargs['usermeta'].append((key, value))
+                payload['usermeta'].append((key, value))
+
                 
         # aquire transport, fire, release
         (idx, transport) = yield self._getFreeTransport()
         ret = yield transport.put(robj.get_bucket().get_name(),
                                   robj.get_key(),
-                                  robj.get_encoded_data(),
+                                  payload,
+                                  vclock,
                                   **kwargs
                                   )
         yield self._releaseTransport(idx)
@@ -1011,7 +1037,6 @@ class PBCTransport(FeatureDetection):
            optional bytes vclock = 2;
            optional bool unchanged = 3;
         }
-        
         """
         vclock = res.vclock
         resList = []
@@ -1027,7 +1052,7 @@ class PBCTransport(FeatureDetection):
 
             if len(content.links):
                 metadata[MD_LINKS] = []
-                for link in content.links:
+                for l in content.links:
                     metadata[MD_LINKS].append(RiakLink(l.bucket,l.key,l.tag))
 
             if len(content.usermeta):
@@ -1041,6 +1066,50 @@ class PBCTransport(FeatureDetection):
                     metadata[MD_INDEX].append(RiakIndexEntry(ie.key, ie.value))
             resList.append((metadata, data))
         return vclock, resList
+
+    @defer.inlineCallbacks
+    def delete(self, robj, rw=None, r = None, w = None, dw = None, pr = None, pw = None):
+        """
+        Delete an object.
+        """
+        # We could detect quorum_controls here but HTTP ignores
+        # unknown flags/params.
+        kwargs = {'rw' : rw, 'r': r, 'w': w, 'dw': dw, 'pr': pr, 'pw': pw}
+        headers = {}
+
+        ts = yield self.tombstone_vclocks()
+        if ts and robj.vclock() is not None:
+            kwargs['vclock'] = robj.vclock()
+
+        (idx, transport) = yield self._getFreeTransport()
+        ret = yield transport.delete(robj.get_bucket().get_name(),
+                                     robj.get_key(),
+                                     **kwargs
+                                     )
+
+        yield self._releaseTransport(idx)
+        defer.returnValue(ret)
+    
+    @defer.inlineCallbacks
+    def server_version(self):
+        if not self._s_version:
+            self._s_version = yield self._server_version()
+
+        defer.returnValue(StrictVersion(self._s_version))
+
+    @defer.inlineCallbacks
+    def _server_version(self):
+        (idx, transport) = yield self._getFreeTransport()
+        stats = yield transport.getServerInfo()
+        yield self._releaseTransport(idx)
+        
+        if stats is not None:
+            if self.debug:
+                print "[%s] fetched server version: %s" % (self.__class__.__name__, stats.server_version)
+            defer.returnValue(stats.server_version)
+        else:
+            defer.returnValue("0.14.0")
+        
         
     def decodeJson(self, s):
         return self.client.get_decoder('application/json')(s)
