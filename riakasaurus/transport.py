@@ -55,6 +55,23 @@ class ITransport(Interface):
         fetch a key from the server
         """
 
+    def delete(self, robj, rw=None, r = None, w = None, dw = None, pr = None, pw = None):
+        """
+        delete a key from the bucket
+        """
+        
+    def server_version(self):
+        """
+        return cached server version 
+        """
+    def _server_version(self):
+        """
+        Gets the server version from the server. To be implemented by
+        the individual transport class.
+        :rtype string
+        """
+
+        
 class FeatureDetection(object):
     _s_version = None
 
@@ -885,25 +902,32 @@ class StatefulTransport(object):
     def __init__(self,transport):
         self.__transport = transport
         self.__state = 'idle'
-        self.__age   = time.time()
+        self.__created = time.time()
+        self.__used = time.time()
 
     def __repr__(self):
-        return '<StatefulTransport age=%.2fs state=\'%s\' transport=%s>' % (time.time() - self.__age, self.__state, self.__transport)
+        return '<StatefulTransport idle=%.2fs state=\'%s\' transport=%s>' % (time.time() - self.__used, self.__state, self.__transport)
 
     def isActive(self):
         return self.__state == 'active'
 
     def setActive(self):
         self.__state = 'active'
+        self.__used = time.time()
 
     def isIdle(self):
         return self.__state == 'idle'
 
     def setIdle(self):
         self.__state = 'idle'
+        self.__used = time.time()
 
     def getTransport(self):
         return self.__transport
+
+    def age(self):
+        return time.time() - self.__used
+        
         
 
 class PBCTransport(FeatureDetection):
@@ -911,9 +935,10 @@ class PBCTransport(FeatureDetection):
 
     implements(ITransport)
 
-    
     debug = 1
-    __MAX_TRANSPORTS = 1000
+    MAX_TRANSPORTS = 50
+    MAX_IDLETIME   = 5*60     # in seconds
+    GC_TIME        = 1        # how often (in seconds) the garbage collection should run
     
     def __init__(self, client):
         self._prefix = client._prefix
@@ -922,20 +947,21 @@ class PBCTransport(FeatureDetection):
         self.client = client
         self._client_id = None
         self._transports = []    # list of transports, empty on start
+        reactor.callLater(self.GC_TIME, self._garbageCollect)
 
 
     @defer.inlineCallbacks
     def _getFreeTransport(self):
         foundOne = False
-        for idx,stp in enumerate(self._transports):
+        for stp in self._transports:
             if stp.isIdle():
                 stp.setActive()
                 foundOne = True
                 if self.debug:
-                    print "[%s] aquired idle transport %d: %s" % (self.__class__.__name__, idx,stp)
-                defer.returnValue((idx,stp.getTransport()))
+                    print "[%s] aquired idle transport[%d]: %s" % (self.__class__.__name__, len(self._transports),stp)
+                defer.returnValue(stp)
         if not foundOne:
-            if len(self._transports) > self.__MAX_TRANSPORTS:
+            if len(self._transports) > self.MAX_TRANSPORTS:
                 raise Exception("to many transports, aborting")
 
             # nothin free, create a new protocol instance, append
@@ -946,17 +972,23 @@ class PBCTransport(FeatureDetection):
             self._transports.append(stp)
             stp.setActive()
             if self.debug:
-                print "[%s] allocate new transport %d: %s" % (self.__class__.__name__, idx,stp)
-            defer.returnValue((idx,stp.getTransport()))
+                print "[%s] allocate new transport[%d]: %s" % (self.__class__.__name__, len(self._transports),stp)
+            defer.returnValue(stp)
 
-    def _releaseTransport(self,idx):
-        if self.debug:
-            print "[%s] idle transport %d" % (self.__class__.__name__, idx)
-        self._transports[idx].setIdle()
+    def _garbageCollect(self):
+        for idx, stp in enumerate(self._transports):
+            if stp.isIdle() and stp.age() > self.MAX_IDLETIME:
+                stp.getTransport().quit()
+                if self.debug:
+                    print "[%s] expire transport[%d] %s" % (self.__class__.__name__, idx,stp)
+                del self._transports[idx]
+        reactor.callLater(0.1, self._garbageCollect)
 
     def __del__(self):
         """on shutdown, close all transports"""
         for stl in self._transports:
+            if self.debug:
+                print "[%s] transport[%d].quit() %s" % (self.__class__.__name__, len(self._transports),stp)
             stl.getTransport().quit()
 
     @defer.inlineCallbacks
@@ -969,29 +1001,39 @@ class PBCTransport(FeatureDetection):
                   'if_none_match' : if_none_match
                   }
         # vclock
-        if robj.vclock(): kwargs['vclock'] = robj.vclock()
+        
+        vclock = robj.vclock() or None
 
+
+        payload = {
+            'value' : robj.get_encoded_data(),
+            'content_type' : robj.get_content_type(),
+            }
+        
         # links
         links = robj.get_links()
         if links:
-            kwargs['links'] = []
+            payload['links'] = []
             for l in links:
-                kwargs['links'].append((l.get_bucket.get_name(), l.get_key(), l.get_tag()))
+                payload['links'].append((l.get_bucket(), l.get_key(), l.get_tag()))
 
         # usermeta
         if robj.get_usermeta():
-            kwargs['usermeta'] = []
+            payload['usermeta'] = []
             for key, value in robj.get_usermeta().iteritems():
-                kwargs['usermeta'].append((key, value))
+                payload['usermeta'].append((key, value))
+
                 
         # aquire transport, fire, release
-        (idx, transport) = yield self._getFreeTransport()
+        stp = yield self._getFreeTransport()
+        transport = stp.getTransport()
         ret = yield transport.put(robj.get_bucket().get_name(),
                                   robj.get_key(),
-                                  robj.get_encoded_data(),
+                                  payload,
+                                  vclock,
                                   **kwargs
                                   )
-        yield self._releaseTransport(idx)
+        stp.setIdle()
         if return_body:
             defer.returnValue([x.value for x in ret.content])
         else:
@@ -1001,16 +1043,65 @@ class PBCTransport(FeatureDetection):
     def get(self, robj, r = None, pr = None, vtag = None):
 
         # ***FIXME*** whats vtag for? ignored for now
-        (idx, transport) = yield self._getFreeTransport()
+        
+        stp = yield self._getFreeTransport()
+        transport = stp.getTransport()
         ret = yield transport.get(robj.get_bucket().get_name(),
                                   robj.get_key(),
                                   r = r,
                                   pr = pr)
 
-        yield self._releaseTransport(idx)
+        stp.setIdle()
         defer.returnValue(self.parseRpbGetResp(ret))
 
 
+    @defer.inlineCallbacks
+    def delete(self, robj, rw=None, r = None, w = None, dw = None, pr = None, pw = None):
+        """
+        Delete an object.
+        """
+        # We could detect quorum_controls here but HTTP ignores
+        # unknown flags/params.
+        kwargs = {'rw' : rw, 'r': r, 'w': w, 'dw': dw, 'pr': pr, 'pw': pw}
+        headers = {}
+
+        ts = yield self.tombstone_vclocks()
+        if ts and robj.vclock() is not None:
+            kwargs['vclock'] = robj.vclock()
+
+        stp = yield self._getFreeTransport()
+        transport = stp.getTransport()
+        ret = yield transport.delete(robj.get_bucket().get_name(),
+                                     robj.get_key(),
+                                     **kwargs
+                                     )
+
+        stp.setIdle()
+        defer.returnValue(ret)
+    
+    @defer.inlineCallbacks
+    def server_version(self):
+        if not self._s_version:
+            self._s_version = yield self._server_version()
+
+        defer.returnValue(StrictVersion(self._s_version))
+
+    @defer.inlineCallbacks
+    def _server_version(self):
+        stp = yield self._getFreeTransport()
+        transport = stp.getTransport()
+
+        stats = yield transport.getServerInfo()
+        stp.setIdle()
+
+        
+        if stats is not None:
+            if self.debug:
+                print "[%s] fetched server version: %s" % (self.__class__.__name__, stats.server_version)
+            defer.returnValue(stats.server_version)
+        else:
+            defer.returnValue("0.14.0")
+        
     def parseRpbGetResp(self,res):
         """
         adaptor for a RpbGetResp message
@@ -1019,7 +1110,6 @@ class PBCTransport(FeatureDetection):
            optional bytes vclock = 2;
            optional bool unchanged = 3;
         }
-        
         """
         vclock = res.vclock
         resList = []
@@ -1035,7 +1125,7 @@ class PBCTransport(FeatureDetection):
 
             if len(content.links):
                 metadata[MD_LINKS] = []
-                for link in content.links:
+                for l in content.links:
                     metadata[MD_LINKS].append(RiakLink(l.bucket,l.key,l.tag))
 
             if len(content.usermeta):
@@ -1049,7 +1139,8 @@ class PBCTransport(FeatureDetection):
                     metadata[MD_INDEX].append(RiakIndexEntry(ie.key, ie.value))
             resList.append((metadata, data))
         return vclock, resList
-        
+
+            
     def decodeJson(self, s):
         return self.client.get_decoder('application/json')(s)
 
