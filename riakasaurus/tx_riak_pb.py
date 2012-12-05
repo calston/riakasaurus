@@ -1,7 +1,7 @@
 from twisted.protocols.basic import Int32StringReceiver
 from twisted.internet.protocol import ClientFactory
 from twisted.internet.defer import Deferred
-from twisted.internet import reactor
+from twisted.internet import defer, reactor
 
 from struct import pack, unpack
 
@@ -57,6 +57,8 @@ def toHex(s):
 
 class RiakPBC(Int32StringReceiver):
 
+    MAX_LENGTH = 9999999
+    
     riakResponses = {
         MSG_CODE_ERROR_RESP           : RpbErrorResp,
         MSG_CODE_GET_CLIENT_ID_RESP   : RpbGetClientIdResp,
@@ -90,7 +92,7 @@ class RiakPBC(Int32StringReceiver):
         code = pack('B',MSG_CODE_SET_CLIENT_ID_REQ)
         request = RpbSetClientIdReq()
         request.client_id = clientId
-        return self.__send( code + request.SerializeToString())        
+        return self.__send(code,request)        
         
     def getClientId(self):
         code = pack('B',MSG_CODE_GET_CLIENT_ID_REQ)
@@ -120,9 +122,8 @@ class RiakPBC(Int32StringReceiver):
         if kwargs.get('if_modified')  : request.if_modified = kwargs['if_modified']
         if kwargs.get('head')         : request.head = kwargs['head']
         if kwargs.get('deletedvclock'): request.deletedvclock = kwargs['deletedvclock']
-
-        return self.__send(code + request.SerializeToString())        
-        
+            
+        return self.__send(code,request)        
 
     def put(self,bucket,key,content, vclock = None, **kwargs):
         code = pack('B',MSG_CODE_PUT_REQ)
@@ -160,6 +161,7 @@ class RiakPBC(Int32StringReceiver):
                 for l in content['indexes']:
                     indexes = request.content.indexes.add()
                     indexes.key,indexes.value = l
+                    
 
         if kwargs.get('w')               : request.w = self._resolveNums(kwargs['w'])
         if kwargs.get('dw')              : request.dw = self._resolveNums(kwargs['dw'])
@@ -173,7 +175,7 @@ class RiakPBC(Int32StringReceiver):
         if vclock:
             request.vclock = vclock
 
-        return self.__send(code + request.SerializeToString())
+        return self.__send(code,request)        
 
     def delete(self,bucket,key, **kwargs):
         code = pack('B',MSG_CODE_DEL_REQ)
@@ -189,7 +191,7 @@ class RiakPBC(Int32StringReceiver):
         if kwargs.get('pw')     : request.pw = self._resolveNums(kwargs['pw'])
         if kwargs.get('dw')     : request.dw = self._resolveNums(kwargs['dw'])
 
-        return self.__send(code + request.SerializeToString())
+        return self.__send(code,request)        
 
     
     # ------------------------------------------------------------------
@@ -204,7 +206,7 @@ class RiakPBC(Int32StringReceiver):
         request = RpbListKeysReq()
         request.bucket = bucket
         self.__keyList = []
-        return self.__send(code + request.SerializeToString())
+        return self.__send(code,request)        
 
     def getBuckets(self):
         """
@@ -228,7 +230,7 @@ class RiakPBC(Int32StringReceiver):
         if kwargs.get('n_val')      : request.props.n_val = kwargs['n_val']
         if kwargs.get('allow_mult') : request.props.allow_mult = kwargs['allow_mult']
         
-        return self.__send(code + request.SerializeToString())
+        return self.__send(code,request)        
     
 
     
@@ -242,12 +244,16 @@ class RiakPBC(Int32StringReceiver):
         """
         self.factory.connected.callback(self)
 
-    def __send(self, msg):
+    def __send(self, code, request=None):
         """
         helper method for logging, sending and returning the deferred
         """
         if self.debug:
-            print "[%s] %s" % (self.__class__.__name__, toHex(msg))
+            print "[%s] %s %s" % (self.__class__.__name__,  request.__class__.__name__, str(request).replace('\n',' ' ))
+        if request:
+            msg = code + request.SerializeToString()
+        else:
+            msg = code
         self.sendString(msg)
         self.factory.d = Deferred()
         return self.factory.d
@@ -260,16 +266,18 @@ class RiakPBC(Int32StringReceiver):
         messages that dont have a body to parse return True, those are
         listed in self.nonMessages
         """
-        if self.debug:
-            print "RiakPBC.stringReceived: ", toHex(data)
         # decode messagetype
         code = unpack('B',data[:1])[0]
+        if self.debug:
+            print "[%s] stringReceived code %d" % (self.__class__.__name__,code)
         
         if code not in self.riakResponses and code not in self.nonMessages:
             raise RiakPBCException('unknown messagetype: %d' % code)
 
         elif code in self.nonMessages:
             # for instance ping doesnt have a message, so we just return True
+            if self.debug:
+                print "[%s] stringReceived empty message type %d" % (self.__class__.__name__, code)
             self.factory.d.callback(True)
             return
 
@@ -281,6 +289,8 @@ class RiakPBC(Int32StringReceiver):
             # callback
             response = RpbListKeysResp()
             response.ParseFromString(data[1:])
+            if self.debug:
+                print "[%s] %s %s" % (self.__class__.__name__,  response.__class__.__name__, str(response).replace('\n',' ' ))
             
             self.__keyList.extend([x for x in response.keys])
             if response.HasField('done') and response.done:
@@ -291,14 +301,12 @@ class RiakPBC(Int32StringReceiver):
             # normal handling, pick the message code, call ParseFromString()
             # on it, and return the message
             response = self.riakResponses[code]()
-            if self.debug:
-                print "-- RiakPBC.stringReceived --", code
-                print response
-                print "** RiakPBC.stringReceived **"
-                
             if data[1:]:
                 # if there's data, parse it, otherwise return empty object
                 response.ParseFromString(data[1:])
+                if self.debug:
+                    print "[%s] %s %s" % (self.__class__.__name__,  response.__class__.__name__, str(response).replace('\n',' ' ))
+                
                 if code == MSG_CODE_ERROR_RESP:
                     raise RiakPBCException('%s (%d)' % (response.errmsg, response.errcode))
 
@@ -315,8 +323,9 @@ class RiakPBC(Int32StringReceiver):
             return val
             
 
+    @defer.inlineCallbacks
     def quit(self):
-        self.transport.loseConnection()
+        yield self.transport.loseConnection()
 
 
 class RiakPBCClientFactory(ClientFactory):

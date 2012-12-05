@@ -26,9 +26,9 @@ from riakasaurus.riak_index_entry import RiakIndexEntry
 from riakasaurus.mapreduce import RiakLink
 
 # protobuf
-from tx_riak_pb import RiakPBCClient
-from riak_kv_pb2 import *
-from riak_pb2 import *
+from riakasaurus.tx_riak_pb import RiakPBCClient
+from riakasaurus.riak_kv_pb2 import *
+from riakasaurus.riak_pb2 import *
 
 MAX_LINK_HEADER_SIZE = 8192 - 8
 
@@ -935,7 +935,7 @@ class PBCTransport(FeatureDetection):
 
     implements(ITransport)
 
-    debug = 1
+    debug = 0
     MAX_TRANSPORTS = 50
     MAX_IDLETIME   = 5*60     # in seconds
     GC_TIME        = 1        # how often (in seconds) the garbage collection should run
@@ -947,8 +947,7 @@ class PBCTransport(FeatureDetection):
         self.client = client
         self._client_id = None
         self._transports = []    # list of transports, empty on start
-        reactor.callLater(self.GC_TIME, self._garbageCollect)
-
+        self.__gc = reactor.callLater(self.GC_TIME, self._garbageCollect)
 
     @defer.inlineCallbacks
     def _getFreeTransport(self):
@@ -982,14 +981,19 @@ class PBCTransport(FeatureDetection):
                 if self.debug:
                     print "[%s] expire transport[%d] %s" % (self.__class__.__name__, idx,stp)
                 del self._transports[idx]
-        reactor.callLater(0.1, self._garbageCollect)
+        self.__gc = reactor.callLater(self.GC_TIME, self._garbageCollect)
 
-    def __del__(self):
-        """on shutdown, close all transports"""
-        for stl in self._transports:
+    @defer.inlineCallbacks
+    def quit(self):
+        self.__gc.cancel()      # cancel the garbage collector
+        for stp in self._transports:
             if self.debug:
                 print "[%s] transport[%d].quit() %s" % (self.__class__.__name__, len(self._transports),stp)
-            stl.getTransport().quit()
+            yield stp.getTransport().quit()
+        
+    def __del__(self):
+        """on shutdown, close all transports"""
+        self.quit()
 
     @defer.inlineCallbacks
     def put(self, robj, w = None, dw = None, pw = None, return_body = True, if_none_match=False):
@@ -1001,9 +1005,7 @@ class PBCTransport(FeatureDetection):
                   'if_none_match' : if_none_match
                   }
         # vclock
-        
         vclock = robj.vclock() or None
-
 
         payload = {
             'value' : robj.get_encoded_data(),
@@ -1035,7 +1037,8 @@ class PBCTransport(FeatureDetection):
                                   )
         stp.setIdle()
         if return_body:
-            defer.returnValue([x.value for x in ret.content])
+            # defer.returnValue([x.value for x in ret.content])
+            defer.returnValue(self.parseRpbGetResp(ret))
         else:
             defer.returnValue(None)
 
