@@ -1057,6 +1057,19 @@ class PBCTransport(FeatureDetection):
         stp.setIdle()
         defer.returnValue(self.parseRpbGetResp(ret))
 
+    @defer.inlineCallbacks
+    def head(self, robj, r = None, pr = None, vtag = None):
+        stp = yield self._getFreeTransport()
+        transport = stp.getTransport()
+        ret = yield transport.get(robj.get_bucket().get_name(),
+                                  robj.get_key(),
+                                  r = r,
+                                  pr = pr,
+                                  head = True)
+
+        stp.setIdle()
+        defer.returnValue(self.parseRpbGetResp(ret))
+
 
     @defer.inlineCallbacks
     def delete(self, robj, rw=None, r = None, w = None, dw = None, pr = None, pw = None):
