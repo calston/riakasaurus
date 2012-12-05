@@ -19,7 +19,8 @@ from xml.etree import ElementTree
 
 # MD_ resources
 from riakasaurus.metadata import *
-from riakasaurus.util import Agent
+from twisted.web.client import Agent
+
 
 from riakasaurus.riak_index_entry import RiakIndexEntry
 from riakasaurus.mapreduce import RiakLink
@@ -192,8 +193,11 @@ class StringProducer(object):
 
 class HTTPTransport(FeatureDetection):
     """ HTTP Transport for Riak """
-    def __init__(self, client):
-        self._prefix = client._prefix
+    def __init__(self, client, prefix=None):
+        if prefix:
+            self._prefix = prefix
+        else:
+            self._prefix = client._prefix
         self.host = client._host
         self.port = client._port
         self.client = client
@@ -220,9 +224,12 @@ class HTTPTransport(FeatureDetection):
         h = {}
         for k, v in headers.items():
             if not isinstance(v, list):
-                h[k] = [v]
+                h[k.lower()] = [v]
             else:
-                h[k] = v
+                h[k.lower()] = v
+
+        if not 'content-type' in h.keys():
+            h['content-type'] = ['application/json']
 
         if body:
             bodyProducer = StringProducer(body)
@@ -343,7 +350,7 @@ class HTTPTransport(FeatureDetection):
         # If stats is disabled, we can't assume the Riak version
         # is >= 1.1. However, we can assume the new URL scheme is
         # at least version 1.0
-        elif 'riak_kv_wm_buckets' in self.get_resources():
+        elif 'riak_kv_wm_buckets' in (yield self.get_resources()):
             defer.returnValue("1.0.0")
         else:
             defer.returnValue("0.14.0")
@@ -355,7 +362,7 @@ class HTTPTransport(FeatureDetection):
         :rtype dict
         """
         response = yield self.http_request('GET', '/', {'Accept':'application/json'})
-        if response[0]['http_status'] is 200:
+        if response[0]['http_code'] is 200:
             defer.returnValue(self.decodeJson(response[1]))
         else:
             defer.returnValue({})
@@ -388,6 +395,7 @@ class HTTPTransport(FeatureDetection):
             params['vtag'] = vtag
         url = self.build_rest_path(robj.get_bucket(), robj.get_key(),
                                    params=params)
+
         response = yield self.http_request('HEAD', url)
         defer.returnValue(
             self.parse_body(response, [200, 300, 404])
@@ -404,6 +412,7 @@ class HTTPTransport(FeatureDetection):
         url = self.build_rest_path(bucket=robj.get_bucket(), key=robj.get_key(),
                                    params=params)
         headers = self.build_put_headers(robj)
+
         # TODO: use a more general 'prevent_stale_writes' semantics,
         # which is a superset of the if_none_match semantics.
         if if_none_match:
@@ -685,7 +694,6 @@ class HTTPTransport(FeatureDetection):
             for link in links:
                 header = self.to_link_header(link)
                 if len(current_header + header) > MAX_LINK_HEADER_SIZE:
-                    headers.add('Link', current_header)
                     current_header = ''
 
                 if current_header != '': header = ', ' + header

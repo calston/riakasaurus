@@ -11,7 +11,7 @@ import urllib
 import json
 from twisted.internet import defer
 
-from riakasaurus import mapreduce, util, bucket
+from riakasaurus import mapreduce, bucket
 from riakasaurus.search import RiakSearch
 
 from riakasaurus import transport
