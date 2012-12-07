@@ -949,6 +949,9 @@ class PBCTransport(FeatureDetection):
         self._transports = []    # list of transports, empty on start
         self.__gc = reactor.callLater(self.GC_TIME, self._garbageCollect)
 
+    def setTimeout(self,t):
+        self.timeout = t
+
     @defer.inlineCallbacks
     def _getFreeTransport(self):
         foundOne = False
@@ -966,6 +969,8 @@ class PBCTransport(FeatureDetection):
             # nothin free, create a new protocol instance, append
             # it to self._transports and return it
             transport = yield RiakPBCClient().connect(self.host, self.port)
+            if self.timeout:
+                transport.setTimeout(self.timeout)
             stp = StatefulTransport(transport)
             idx = len(self._transports)
             self._transports.append(stp)
