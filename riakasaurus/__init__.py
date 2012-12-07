@@ -6,7 +6,7 @@ Basho Technologies, Inc. http://basho.com/
 Modules based on code originally disbributed by Basho:
     http://riak.basho.com/python_client_api/riak.html
 """
-VERSION = '1.0.6'
+VERSION = '1.0.8'
 
 LICENSE = """
 %s

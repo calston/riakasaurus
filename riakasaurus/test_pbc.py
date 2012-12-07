@@ -196,6 +196,7 @@ class Test_Riakasaurus(unittest.TestCase):
     def setUp(self):
         self.client = riak.RiakClient(host='127.0.0.1', port=8087,
                                       transport = transport.PBCTransport)
+        self.bucket = self.client.bucket('my_bucket')
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -206,18 +207,32 @@ class Test_Riakasaurus(unittest.TestCase):
     @defer.inlineCallbacks
     def test_store_and_get(self):
         log.msg("*** testing store_and_get")
-        bucket = self.client.bucket('my_bucket')
 
         payload = {'colors': ['white', 'black']}
         key = 'penguins'
-        obj = bucket.new(key, payload)
+        obj = self.bucket.new(key, payload)
         res = yield obj.store()
 
-        res = yield bucket.get(key)
+        res = yield self.bucket.get(key)
         
         self.assertEqual(res.get_data(),payload)
         log.msg("done store_and_get")
 
+    @defer.inlineCallbacks
+    def test_head(self):
+        """create a object, and retrieve metadata via head(), no content is loaded"""
+        log.msg("*** head")
+
+        obj = self.bucket.new("foo1", "test1")
+        yield obj.store()
+
+        obj = yield self.bucket.head("foo1")
+        self.assertEqual(obj.exists(), True)
+        self.assertEqual(obj.get_data(), None)
+
+        log.msg("done head")
+
+        
     # @defer.inlineCallbacks
     # def test_link(self):
     #     log.msg("*** testing link")
@@ -237,3 +252,5 @@ class Test_Riakasaurus(unittest.TestCase):
     #     self.assertEqual(len(links),1)
     #     self.assertEqual(links[0].get_key(),'orkas')
     #     log.msg("done link")
+
+        

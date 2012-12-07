@@ -2,6 +2,7 @@ from twisted.protocols.basic import Int32StringReceiver
 from twisted.internet.protocol import ClientFactory
 from twisted.internet.defer import Deferred
 from twisted.internet import defer, reactor
+from twisted.python.failure import Failure
 
 from struct import pack, unpack
 
@@ -82,6 +83,8 @@ class RiakPBC(Int32StringReceiver):
         'all'     : 4294967295-3,
         'default' : 4294967295-4,
         }
+
+    timeout = None
     
     debug = 0
 
@@ -244,6 +247,9 @@ class RiakPBC(Int32StringReceiver):
         """
         self.factory.connected.callback(self)
 
+    def setTimeout(self,t):
+        self.timeout = t
+        
     def __send(self, code, request=None):
         """
         helper method for logging, sending and returning the deferred
@@ -256,7 +262,17 @@ class RiakPBC(Int32StringReceiver):
             msg = code
         self.sendString(msg)
         self.factory.d = Deferred()
+        if self.timeout:
+            self.timeoutd = reactor.callLater(self.timeout, self._triggerTimeout)
+            
         return self.factory.d
+
+    def _triggerTimeout(self):
+        if not self.factory.d.called:
+            try:
+                self.factory.d.errback(RiakPBCException('timeout'))
+            except Exception, e:
+                print "Unable to handle Timeout: %s" % e
     
     def stringReceived(self, data):
         """
@@ -266,6 +282,9 @@ class RiakPBC(Int32StringReceiver):
         messages that dont have a body to parse return True, those are
         listed in self.nonMessages
         """
+        if not self.timeoutd.called:
+            self.timeoutd.cancel()  # stop timeout from beeing raised
+        
         # decode messagetype
         code = unpack('B',data[:1])[0]
         if self.debug:
@@ -278,7 +297,8 @@ class RiakPBC(Int32StringReceiver):
             # for instance ping doesnt have a message, so we just return True
             if self.debug:
                 print "[%s] stringReceived empty message type %d" % (self.__class__.__name__, code)
-            self.factory.d.callback(True)
+            if not self.factory.d.called:
+                self.factory.d.callback(True)
             return
 
         elif code == MSG_CODE_LIST_KEYS_RESP:
@@ -294,8 +314,9 @@ class RiakPBC(Int32StringReceiver):
             
             self.__keyList.extend([x for x in response.keys])
             if response.HasField('done') and response.done:
-                self.factory.d.callback(self.__keyList)
-                self.__keyList = []
+                if not self.factory.d.called:
+                    self.factory.d.callback(self.__keyList)
+                    self.__keyList = []
 
         else:
             # normal handling, pick the message code, call ParseFromString()
@@ -310,7 +331,8 @@ class RiakPBC(Int32StringReceiver):
                 if code == MSG_CODE_ERROR_RESP:
                     raise RiakPBCException('%s (%d)' % (response.errmsg, response.errcode))
 
-            self.factory.d.callback(response)
+            if not self.factory.d.called:
+                self.factory.d.callback(response)
 
     def _resolveNums(self,val):
         if isinstance(val, str):
