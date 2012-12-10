@@ -939,6 +939,7 @@ class PBCTransport(FeatureDetection):
     MAX_TRANSPORTS = 50
     MAX_IDLETIME   = 5*60     # in seconds
     GC_TIME        = 1        # how often (in seconds) the garbage collection should run
+    timeout        None
     
     def __init__(self, client):
         self._prefix = client._prefix
