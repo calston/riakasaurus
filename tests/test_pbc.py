@@ -1,17 +1,15 @@
 #!/usr/bin/env python
 """
-riakasaurus_pbc trial
+tests for RiakPBCClient, trial
 """
 
 from twisted.trial import unittest
-from twisted.internet import defer, reactor
+from twisted.internet import defer
 from twisted.python import log
 
 from riakasaurus.tx_riak_pb import RiakPBCClient
 from riakasaurus.riak_kv_pb2 import *
 from riakasaurus.riak_pb2 import *
-
-from riakasaurus import transport,riak
 
 
 VERBOSE = False
@@ -19,7 +17,6 @@ VERBOSE = False
 if VERBOSE:
     import sys
     log.startLogging(sys.stderr)
-
 
 class Test_PBCClient(unittest.TestCase):
 
@@ -127,19 +124,19 @@ class Test_PBCClient(unittest.TestCase):
         log.msg("done testing getKeys")
 
 
-    # @defer.inlineCallbacks
-    # def test_getBuckets(self):
-    #     log.msg("*** testing getBuckets")
+    @defer.inlineCallbacks
+    def test_getBuckets(self):
+        log.msg("*** testing getBuckets")
 
-    #     # make sure "foo" is in
-    #     put = yield self.client.put('bucket','key', 'foo')
-    #     self.assertTrue(isinstance(put, RpbPutResp))
+        # make sure "foo" is in
+        put = yield self.client.put('bucket','key', 'foo')
+        self.assertTrue(isinstance(put, RpbPutResp))
         
-    #     # get existing buckets message
-    #     res = yield self.client.getBuckets()
-    #     buckets = [b for b in res.buckets]
-    #     self.assertTrue('bucket' in buckets)
-    #     log.msg("done testing getBuckets")
+        # get existing buckets message
+        res = yield self.client.getBuckets()
+        buckets = [b for b in res.buckets]
+        self.assertTrue('bucket' in buckets)
+        log.msg("done testing getBuckets")
 
 
     @defer.inlineCallbacks
@@ -191,66 +188,3 @@ class Test_PBCClient(unittest.TestCase):
 
         log.msg("done testing links")
     
-class Test_Riakasaurus(unittest.TestCase):
-
-    def setUp(self):
-        self.client = riak.RiakClient(host='127.0.0.1', port=8087,
-                                      transport = transport.PBCTransport)
-        self.bucket = self.client.bucket('my_bucket')
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        # shut down pb connection explicitly
-        t = self.client.get_transport()
-        yield t.quit()
-
-    @defer.inlineCallbacks
-    def test_store_and_get(self):
-        log.msg("*** testing store_and_get")
-
-        payload = {'colors': ['white', 'black']}
-        key = 'penguins'
-        obj = self.bucket.new(key, payload)
-        res = yield obj.store()
-
-        res = yield self.bucket.get(key)
-        
-        self.assertEqual(res.get_data(),payload)
-        log.msg("done store_and_get")
-
-    @defer.inlineCallbacks
-    def test_head(self):
-        """create a object, and retrieve metadata via head(), no content is loaded"""
-        log.msg("*** head")
-
-        obj = self.bucket.new("foo1", "test1")
-        yield obj.store()
-
-        obj = yield self.bucket.head("foo1")
-        self.assertEqual(obj.exists(), True)
-        self.assertEqual(obj.get_data(), None)
-
-        log.msg("done head")
-
-        
-    # @defer.inlineCallbacks
-    # def test_link(self):
-    #     log.msg("*** testing link")
-    #     bucket = self.client.bucket('my_bucket')
-
-    #     payload = {'colors': ['white', 'black']}
-    #     key = 'penguins'
-
-    #     sub = bucket.new('orkas', payload)
-    #     obj = bucket.new(key, payload)
-
-    #     obj.add_link(sub, 'orkas')
-    #     yield obj.store()
-    #     res = yield bucket.get(key)
-    #     links = res.get_links()
-        
-    #     self.assertEqual(len(links),1)
-    #     self.assertEqual(links[0].get_key(),'orkas')
-    #     log.msg("done link")
-
-        

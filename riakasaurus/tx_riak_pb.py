@@ -43,6 +43,8 @@ MSG_CODE_INDEX_RESP = 26
 MSG_CODE_SEARCH_QUERY_REQ = 27
 MSG_CODE_SEARCH_QUERY_RESP = 28
 
+
+
 class RiakPBCException(Exception):
     pass
 
@@ -71,6 +73,39 @@ class RiakPBC(Int32StringReceiver):
         MSG_CODE_GET_BUCKET_RESP      : RpbGetBucketResp,
         MSG_CODE_GET_SERVER_INFO_RESP : RpbGetServerInfoResp,
         }
+
+    PBMessageTypes = {
+        0 : 'ERROR_RESP',
+        1 : 'PING_REQ',
+        2 : 'PING_RESP',
+        3 : 'GET_CLIENT_ID_REQ',
+        4 : 'GET_CLIENT_ID_RESP',
+        5 : 'SET_CLIENT_ID_REQ',
+        6 : 'SET_CLIENT_ID_RESP',
+        7 : 'GET_SERVER_INFO_REQ',
+        8 : 'GET_SERVER_INFO_RESP',
+        9 : 'GET_REQ',
+        10 : 'GET_RESP',
+        11 : 'PUT_REQ',
+        12 : 'PUT_RESP',
+        13 : 'DEL_REQ',
+        14 : 'DEL_RESP',
+        15 : 'LIST_BUCKETS_REQ',
+        16 : 'LIST_BUCKETS_RESP',
+        17 : 'LIST_KEYS_REQ',
+        18 : 'LIST_KEYS_RESP',
+        19 : 'GET_BUCKET_REQ',
+        20 : 'GET_BUCKET_RESP',
+        21 : 'SET_BUCKET_REQ',
+        22 : 'SET_BUCKET_RESP',
+        23 : 'MAPRED_REQ',
+        24 : 'MAPRED_RESP',
+        25 : 'INDEX_REQ',
+        26 : 'INDEX_RESP',
+        27 : 'SEARCH_QUERY_REQ',
+        28 : 'SEARCH_QUERY_RESP',
+        }
+    
 
     nonMessages = (MSG_CODE_PING_RESP,
                    MSG_CODE_DEL_RESP,
@@ -118,16 +153,19 @@ class RiakPBC(Int32StringReceiver):
         request.bucket = bucket
         request.key = key
 
-        if kwargs.get('r')            : request.r = self._resolveNums(kwargs['r'])
-        if kwargs.get('pr')           : request.pr = self._resolveNums(kwargs['pr'])
-        if kwargs.get('basic_quorum') : request.basic_quorum = kwargs['basic_quorum']
-        if kwargs.get('notfound_ok')  : request.notfound_ok = kwargs['notfound_ok']
-        if kwargs.get('if_modified')  : request.if_modified = kwargs['if_modified']
-        if kwargs.get('head')         : request.head = kwargs['head']
-        if kwargs.get('deletedvclock'): request.deletedvclock = kwargs['deletedvclock']
+        if 'r' in kwargs            : request.r = self._resolveNums(kwargs['r'])
+        if 'pr' in kwargs           : request.pr = self._resolveNums(kwargs['pr'])
+        if 'basic_quorum' in kwargs : request.basic_quorum = kwargs['basic_quorum']
+        if 'notfound_ok' in kwargs  : request.notfound_ok = kwargs['notfound_ok']
+        if 'if_modified' in kwargs  : request.if_modified = kwargs['if_modified']
+        if 'head' in kwargs         : request.head = kwargs['head']
+        if 'deletedvclock' in kwargs: request.deletedvclock = kwargs['deletedvclock']
 
         return self.__send(code,request)
 
+    def put_new(self,bucket,key,content, vclock = None, **kwargs):
+        return put(bucket,key,content, vclock, kwargs)
+    
     def put(self,bucket,key,content, vclock = None, **kwargs):
         code = pack('B',MSG_CODE_PUT_REQ)
         request = RpbPutReq()
@@ -139,41 +177,41 @@ class RiakPBC(Int32StringReceiver):
         else:
             # assume its a dict
             request.content.value = content['value'] # mandatory
-            if content.get('content_type'): request.content.content_type = content['content_type']
-            if content.get('charset'): request.content.charset = content['charset']
-            if content.get('content_encoding'): request.content.content_encoding = content['content_encoding']
-            if content.get('vtag'): request.content.vtag = content['vtag']
-            if content.get('last_mod'): request.content.last_mod = content['last_mod']
-            if content.get('last_mod_usecs'): request.content.last_mod_usecs = content['last_mod_usecs']
-            if content.get('deleted'): request.content.deleted = content['deleted']
+            if 'content_type' in content    : request.content.content_type = content['content_type']
+            if 'charset' in content         : request.content.charset = content['charset']
+            if 'content_encoding' in content: request.content.content_encoding = content['content_encoding']
+            if 'vtag' in content            : request.content.vtag = content['vtag']
+            if 'last_mod' in content        : request.content.last_mod = content['last_mod']
+            if 'last_mod_usecs' in content  : request.content.last_mod_usecs = content['last_mod_usecs']
+            if 'deleted' in content         : request.content.deleted = content['deleted']
 
             # write links if there are any
-            if content.get('links') and isinstance(content['links'], list):
+            if 'links' in content and isinstance(content['links'], list):
                 for l in content['links']:
                     link = request.content.links.add()
                     link.bucket,link.key,link.tag = l
 
             # usermeta
-            if content.get('usermeta') and isinstance(content['usermeta'], list):
+            if 'usermeta' in content and isinstance(content['usermeta'], list):
                 for l in content['usermeta']:
                     usermeta = request.content.usermeta.add()
                     usermeta.key,usermeta.value = l
 
             # indexes
-            if content.get('indexes') and isinstance(content['indexes'], list):
+            if 'indexes' in content and isinstance(content['indexes'], list):
                 for l in content['indexes']:
                     indexes = request.content.indexes.add()
                     indexes.key,indexes.value = l
 
 
-        if kwargs.get('w')               : request.w = self._resolveNums(kwargs['w'])
-        if kwargs.get('dw')              : request.dw = self._resolveNums(kwargs['dw'])
-        if kwargs.get('return_body')     : request.return_body = kwargs['return_body']
-        if kwargs.get('pw')              : request.pw = self._resolveNums(kwargs['pw'])
-        if kwargs.get('if_modified')     : request.if_modified = kwargs['if_modified']
-        if kwargs.get('if_not_modified') : request.if_not_modified = kwargs['if_not_modified']
-        if kwargs.get('if_none_match')   : request.if_none_match = kwargs['if_none_match']
-        if kwargs.get('return_head')     : request.return_head = kwargs['return_head']
+        if 'w' in kwargs               : request.w = self._resolveNums(kwargs['w'])
+        if 'dw' in kwargs              : request.dw = self._resolveNums(kwargs['dw'])
+        if 'return_body' in kwargs     : request.return_body = kwargs['return_body']
+        if 'pw' in kwargs              : request.pw = self._resolveNums(kwargs['pw'])
+        if 'if_modified' in kwargs     : request.if_modified = kwargs['if_modified']
+        if 'if_not_modified' in kwargs : request.if_not_modified = kwargs['if_not_modified']
+        if 'if_none_match' in kwargs   : request.if_none_match = kwargs['if_none_match']
+        if 'return_head' in kwargs     : request.return_head = kwargs['return_head']
 
         if vclock:
             request.vclock = vclock
@@ -186,13 +224,14 @@ class RiakPBC(Int32StringReceiver):
         request.bucket = bucket
         request.key = key
 
-        if kwargs.get('rw')     : request.rw = self._resolveNums(kwargs['rw'])
-        if kwargs.get('vclock') : request.vclock = kwargs['vclock']
-        if kwargs.get('r')      : request.r = self._resolveNums(kwargs['r'])
-        if kwargs.get('w')      : request.w = self._resolveNums(kwargs['w'])
-        if kwargs.get('pr')     : request.pr = self._resolveNums(kwargs['pr'])
-        if kwargs.get('pw')     : request.pw = self._resolveNums(kwargs['pw'])
-        if kwargs.get('dw')     : request.dw = self._resolveNums(kwargs['dw'])
+        if 'vclock' in kwargs and kwargs['vclock']:
+            request.vclock = kwargs['vclock']
+        if 'rw' in kwargs     : request.rw = self._resolveNums(kwargs['rw'])
+        if 'r' in kwargs      : request.r = self._resolveNums(kwargs['r'])
+        if 'w' in kwargs      : request.w = self._resolveNums(kwargs['w'])
+        if 'pr' in kwargs     : request.pr = self._resolveNums(kwargs['pr'])
+        if 'pw' in kwargs     : request.pw = self._resolveNums(kwargs['pw'])
+        if 'dw' in kwargs     : request.dw = self._resolveNums(kwargs['dw'])
 
         return self.__send(code,request)
 
@@ -230,11 +269,10 @@ class RiakPBC(Int32StringReceiver):
         request = RpbSetBucketReq()
         request.bucket = bucket
 
-        if kwargs.get('n_val')      : request.props.n_val = kwargs['n_val']
-        if kwargs.get('allow_mult') : request.props.allow_mult = kwargs['allow_mult']
+        if 'n_val' in kwargs      : request.props.n_val = kwargs['n_val']
+        if 'allow_mult' in kwargs : request.props.allow_mult = kwargs['allow_mult']
 
         return self.__send(code,request)
-
 
 
     # ------------------------------------------------------------------
@@ -288,7 +326,7 @@ class RiakPBC(Int32StringReceiver):
         # decode messagetype
         code = unpack('B',data[:1])[0]
         if self.debug:
-            print "[%s] stringReceived code %d" % (self.__class__.__name__,code)
+            print "[%s] stringReceived code %s" % (self.__class__.__name__,self.PBMessageTypes[code])
 
         if code not in self.riakResponses and code not in self.nonMessages:
             raise RiakPBCException('unknown messagetype: %d' % code)
@@ -296,7 +334,7 @@ class RiakPBC(Int32StringReceiver):
         elif code in self.nonMessages:
             # for instance ping doesnt have a message, so we just return True
             if self.debug:
-                print "[%s] stringReceived empty message type %d" % (self.__class__.__name__, code)
+                print "[%s] stringReceived empty message type %s" % (self.__class__.__name__, self.PBMessageTypes[code])
             if not self.factory.d.called:
                 self.factory.d.callback(True)
             return
@@ -322,7 +360,7 @@ class RiakPBC(Int32StringReceiver):
             # normal handling, pick the message code, call ParseFromString()
             # on it, and return the message
             response = self.riakResponses[code]()
-            if data[1:]:
+            if len(data) > 1:
                 # if there's data, parse it, otherwise return empty object
                 response.ParseFromString(data[1:])
                 if self.debug:

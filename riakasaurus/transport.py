@@ -64,13 +64,33 @@ class ITransport(Interface):
         """
         return cached server version 
         """
+
     def _server_version(self):
         """
         Gets the server version from the server. To be implemented by
         the individual transport class.
         :rtype string
         """
+    def get_buckets(self):
+        """
+        return the existing buckets
+        """
 
+    def ping(self):
+        """
+        Check server is alive
+        """
+
+    def set_bucket_props(self, bucket, props):
+        """
+        Set bucket properties
+        """
+
+    def get_bucket_props(self, bucket):
+        """
+        get bucket properties
+        """
+        
         
 class FeatureDetection(object):
     _s_version = None
@@ -192,6 +212,9 @@ class StringProducer(object):
         pass
 
 class HTTPTransport(FeatureDetection):
+
+    implements(ITransport)
+    
     """ HTTP Transport for Riak """
     def __init__(self, client, prefix=None):
         if prefix:
@@ -928,7 +951,6 @@ class StatefulTransport(object):
     def age(self):
         return time.time() - self.__used
         
-        
 
 class PBCTransport(FeatureDetection):
     """ Protocoll buffer transport for Riak """
@@ -938,7 +960,7 @@ class PBCTransport(FeatureDetection):
     debug = 0
     MAX_TRANSPORTS = 50
     MAX_IDLETIME   = 5*60     # in seconds
-    GC_TIME        = 1        # how often (in seconds) the garbage collection should run
+    GC_TIME        = 100        # how often (in seconds) the garbage collection should run
     timeout        = None
     
     def __init__(self, client):
@@ -948,7 +970,7 @@ class PBCTransport(FeatureDetection):
         self.client = client
         self._client_id = None
         self._transports = []    # list of transports, empty on start
-        self.__gc = reactor.callLater(self.GC_TIME, self._garbageCollect)
+        self._gc = reactor.callLater(self.GC_TIME, self._garbageCollect)
 
     def setTimeout(self,t):
         self.timeout = t
@@ -980,18 +1002,20 @@ class PBCTransport(FeatureDetection):
                 print "[%s] allocate new transport[%d]: %s" % (self.__class__.__name__, len(self._transports),stp)
             defer.returnValue(stp)
 
+    @defer.inlineCallbacks
     def _garbageCollect(self):
         for idx, stp in enumerate(self._transports):
             if stp.isIdle() and stp.age() > self.MAX_IDLETIME:
-                stp.getTransport().quit()
+                yield stp.getTransport().quit()
                 if self.debug:
                     print "[%s] expire transport[%d] %s" % (self.__class__.__name__, idx,stp)
                 del self._transports[idx]
-        self.__gc = reactor.callLater(self.GC_TIME, self._garbageCollect)
-
+        self._gc = reactor.callLater(self.GC_TIME, self._garbageCollect)
+        
     @defer.inlineCallbacks
     def quit(self):
-        self.__gc.cancel()      # cancel the garbage collector
+        self._gc.cancel()      # cancel the garbage collector
+
         for stp in self._transports:
             if self.debug:
                 print "[%s] transport[%d].quit() %s" % (self.__class__.__name__, len(self._transports),stp)
@@ -1100,7 +1124,17 @@ class PBCTransport(FeatureDetection):
 
         stp.setIdle()
         defer.returnValue(ret)
-    
+
+
+    @defer.inlineCallbacks
+    def get_buckets(self):
+        stp = yield self._getFreeTransport()
+        transport = stp.getTransport()
+        ret = yield transport.getBuckets()
+        stp.setIdle()
+        defer.returnValue([x for x in ret.buckets])
+
+        
     @defer.inlineCallbacks
     def server_version(self):
         if not self._s_version:
@@ -1123,7 +1157,51 @@ class PBCTransport(FeatureDetection):
             defer.returnValue(stats.server_version)
         else:
             defer.returnValue("0.14.0")
+
+    @defer.inlineCallbacks
+    def ping(self):
+        """
+        Check server is alive
+        """
+        stp = yield self._getFreeTransport()
+        transport = stp.getTransport()
+        ret = yield transport.ping()
+        stp.setIdle()
+        defer.returnValue(ret == True)
+
+
+    @defer.inlineCallbacks
+    def set_bucket_props(self, bucket, props):
+        """
+        Set bucket properties
+        """
+        stp = yield self._getFreeTransport()
+        transport = stp.getTransport()
+        ret = yield transport.setBucketProperties(bucket.get_name(), **props)
+        stp.setIdle()
+        defer.returnValue(ret == True)
+
+
+    @defer.inlineCallbacks
+    def get_bucket_props(self, bucket):
+        """
+        get bucket properties
+        """
+        stp = yield self._getFreeTransport()
+        transport = stp.getTransport()
+        ret = yield transport.getBucketProperties(bucket.get_name())
+        stp.setIdle()
+        defer.returnValue({'n_val'      : ret.props.n_val,
+                           'allow_mult' : ret.props.allow_mult})
         
+    @defer.inlineCallbacks
+    def get_keys(self, bucket):
+        stp = yield self._getFreeTransport()
+        transport = stp.getTransport()
+        ret = yield transport.getKeys(bucket.get_name())
+        stp.setIdle()
+        defer.returnValue(ret)
+
     def parseRpbGetResp(self,res):
         """
         adaptor for a RpbGetResp message
@@ -1133,6 +1211,8 @@ class PBCTransport(FeatureDetection):
            optional bool unchanged = 3;
         }
         """
+        if res == True:         # empty response
+            return None
         vclock = res.vclock
         resList = []
         for content in res.content: # iterate over RpbContent field
