@@ -1,0 +1,6 @@
+*~
+*.pyc
+build/
+dist/
+riakasaurus.egg-info
+_trial_temp/
