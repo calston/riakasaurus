@@ -1009,7 +1009,7 @@ class PBCTransport(FeatureDetection):
             self._transports.append(stp)
             stp.setActive()
             if self.debug & LOGLEVEL_TRANSPORT:
-                log.warning("[%s] allocate new transport[%d]: %s" % (self.__class__.__name__, len(self._transports),stp), logLevel = self.logToLevel)
+                log.msg("[%s] allocate new transport[%d]: %s" % (self.__class__.__name__, len(self._transports),stp), logLevel = self.logToLevel)
             defer.returnValue(stp)
 
     @defer.inlineCallbacks
