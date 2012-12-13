@@ -977,9 +977,6 @@ class PBCTransport(FeatureDetection):
         self._transports = []    # list of transports, empty on start
         self._gc = reactor.callLater(self.GC_TIME, self._garbageCollect)
 
-        if self.debug:
-            log.startLogging(sys.stderr)
-
     def setTimeout(self,t):
         self.timeout = t
 
