@@ -11,6 +11,7 @@ from twisted.python import log
 from distutils.version import StrictVersion
 
 import urllib
+import sys
 import re, csv
 import time
 from cStringIO import StringIO
@@ -31,6 +32,10 @@ from riakasaurus.riak_kv_pb2 import *
 from riakasaurus.riak_pb2 import *
 
 MAX_LINK_HEADER_SIZE = 8192 - 8
+
+LOGLEVEL_DEBUG = 1
+LOGLEVEL_TRANSPORT = 2
+LOGLEVEL_TRANSPORT_VERBOSE = 4
 
 versions = {
     1: StrictVersion("1.0.0"),
@@ -972,6 +977,9 @@ class PBCTransport(FeatureDetection):
         self._transports = []    # list of transports, empty on start
         self._gc = reactor.callLater(self.GC_TIME, self._garbageCollect)
 
+        if self.debug:
+            log.startLogging(sys.stderr)
+
     def setTimeout(self,t):
         self.timeout = t
 
@@ -982,8 +990,8 @@ class PBCTransport(FeatureDetection):
             if stp.isIdle():
                 stp.setActive()
                 foundOne = True
-                if self.debug:
-                    print "[%s] aquired idle transport[%d]: %s" % (self.__class__.__name__, len(self._transports),stp)
+                if self.debug & LOGLEVEL_TRANSPORT_VERBOSE:
+                    log.msg("[%s] aquired idle transport[%d]: %s" % (self.__class__.__name__, len(self._transports),stp))
                 defer.returnValue(stp)
         if not foundOne:
             if len(self._transports) > self.MAX_TRANSPORTS:
@@ -998,8 +1006,8 @@ class PBCTransport(FeatureDetection):
             idx = len(self._transports)
             self._transports.append(stp)
             stp.setActive()
-            if self.debug:
-                print "[%s] allocate new transport[%d]: %s" % (self.__class__.__name__, len(self._transports),stp)
+            if self.debug & LOGLEVEL_TRANSPORT:
+                log.msg("[%s] allocate new transport[%d]: %s" % (self.__class__.__name__, len(self._transports),stp))
             defer.returnValue(stp)
 
     @defer.inlineCallbacks
@@ -1007,8 +1015,8 @@ class PBCTransport(FeatureDetection):
         for idx, stp in enumerate(self._transports):
             if stp.isIdle() and stp.age() > self.MAX_IDLETIME:
                 yield stp.getTransport().quit()
-                if self.debug:
-                    print "[%s] expire transport[%d] %s" % (self.__class__.__name__, idx,stp)
+                if self.debug % LOGLEVEL_DEBUG:
+                    log.msg("[%s] expire transport[%d] %s" % (self.__class__.__name__, idx,stp))
                 del self._transports[idx]
         self._gc = reactor.callLater(self.GC_TIME, self._garbageCollect)
         
@@ -1017,8 +1025,8 @@ class PBCTransport(FeatureDetection):
         self._gc.cancel()      # cancel the garbage collector
 
         for stp in self._transports:
-            if self.debug:
-                print "[%s] transport[%d].quit() %s" % (self.__class__.__name__, len(self._transports),stp)
+            if self.debug % LOGLEVEL_DEBUG:
+                log.msg("[%s] transport[%d].quit() %s" % (self.__class__.__name__, len(self._transports),stp))
             yield stp.getTransport().quit()
         
     def __del__(self):
@@ -1152,8 +1160,8 @@ class PBCTransport(FeatureDetection):
 
         
         if stats is not None:
-            if self.debug:
-                print "[%s] fetched server version: %s" % (self.__class__.__name__, stats.server_version)
+            if self.debug % LOGLEVEL_DEBUG:
+                log.msg("[%s] fetched server version: %s" % (self.__class__.__name__, stats.server_version))
             defer.returnValue(stats.server_version)
         else:
             defer.returnValue("0.14.0")
