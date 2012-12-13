@@ -1012,11 +1012,17 @@ class PBCTransport(FeatureDetection):
     @defer.inlineCallbacks
     def _garbageCollect(self):
         for idx, stp in enumerate(self._transports):
-            if stp.isIdle() and stp.age() > self.MAX_IDLETIME:
+            if (stp.isIdle() and stp.age() > self.MAX_IDLETIME) 
                 yield stp.getTransport().quit()
                 if self.debug & LOGLEVEL_TRANSPORT:
-                    log.msg("[%s] expire transport[%d] %s" % (self.__class__.__name__, idx,stp), logLevel = self.logToLevel)
+                    log.msg("[%s] expire idle transport[%d] %s" % (self.__class__.__name__, idx,stp), logLevel = self.logToLevel)
                 self._transports.remove(stp)
+            elif self.timeout and stp.isActive() and stp.age() > self.timeout:
+                yield stp.getTransport().quit()
+                if self.debug & LOGLEVEL_TRANSPORT:
+                    log.msg("[%s] expire timeouted transport[%d] %s" % (self.__class__.__name__, idx,stp), logLevel = self.logToLevel)
+                self._transports.remove(stp)
+
         self._gc = reactor.callLater(self.GC_TIME, self._garbageCollect)
         
     @defer.inlineCallbacks
