@@ -1014,9 +1014,9 @@ class PBCTransport(FeatureDetection):
         for idx, stp in enumerate(self._transports):
             if stp.isIdle() and stp.age() > self.MAX_IDLETIME:
                 yield stp.getTransport().quit()
-                if self.debug % LOGLEVEL_DEBUG:
+                if self.debug % LOGLEVEL_TRANSPORT:
                     log.msg("[%s] expire transport[%d] %s" % (self.__class__.__name__, idx,stp), logLevel = self.logToLevel)
-                del self._transports[idx]
+                self._transports.remove(stp)
         self._gc = reactor.callLater(self.GC_TIME, self._garbageCollect)
         
     @defer.inlineCallbacks
