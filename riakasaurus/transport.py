@@ -967,7 +967,7 @@ class PBCTransport(FeatureDetection):
     logToLevel = logging.INFO
     MAX_TRANSPORTS = 50
     MAX_IDLETIME   = 5*60     # in seconds
-    GC_TIME        = 100        # how often (in seconds) the garbage collection should run
+    GC_TIME        = 120        # how often (in seconds) the garbage collection should run
     timeout        = None
     
     def __init__(self, client):
@@ -1011,19 +1011,21 @@ class PBCTransport(FeatureDetection):
 
     @defer.inlineCallbacks
     def _garbageCollect(self):
+        self._gc = reactor.callLater(self.GC_TIME, self._garbageCollect)
         for idx, stp in enumerate(self._transports):
             if (stp.isIdle() and stp.age() > self.MAX_IDLETIME) 
                 yield stp.getTransport().quit()
                 if self.debug & LOGLEVEL_TRANSPORT:
                     log.msg("[%s] expire idle transport[%d] %s" % (self.__class__.__name__, idx,stp), logLevel = self.logToLevel)
+                    log.msg("[%s] %s" % (self.__class__.__name__, self._transports), logLevel = self.logToLevel)
                 self._transports.remove(stp)
             elif self.timeout and stp.isActive() and stp.age() > self.timeout:
                 yield stp.getTransport().quit()
                 if self.debug & LOGLEVEL_TRANSPORT:
                     log.msg("[%s] expire timeouted transport[%d] %s" % (self.__class__.__name__, idx,stp), logLevel = self.logToLevel)
+                    log.msg("[%s] %s" % (self.__class__.__name__, self._transports), logLevel = self.logToLevel)
                 self._transports.remove(stp)
 
-        self._gc = reactor.callLater(self.GC_TIME, self._garbageCollect)
         
     @defer.inlineCallbacks
     def quit(self):
