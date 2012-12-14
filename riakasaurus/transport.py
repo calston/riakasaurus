@@ -1013,7 +1013,7 @@ class PBCTransport(FeatureDetection):
     def _garbageCollect(self):
         self._gc = reactor.callLater(self.GC_TIME, self._garbageCollect)
         for idx, stp in enumerate(self._transports):
-            if (stp.isIdle() and stp.age() > self.MAX_IDLETIME) 
+            if (stp.isIdle() and stp.age() > self.MAX_IDLETIME):
                 yield stp.getTransport().quit()
                 if self.debug & LOGLEVEL_TRANSPORT:
                     log.msg("[%s] expire idle transport[%d] %s" % (self.__class__.__name__, idx,stp), logLevel = self.logToLevel)
