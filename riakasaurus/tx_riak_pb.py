@@ -105,7 +105,7 @@ class RiakPBC(Int32StringReceiver):
         27 : 'SEARCH_QUERY_REQ',
         28 : 'SEARCH_QUERY_RESP',
         }
-    
+
 
     nonMessages = (MSG_CODE_PING_RESP,
                    MSG_CODE_DEL_RESP,
@@ -165,7 +165,7 @@ class RiakPBC(Int32StringReceiver):
 
     def put_new(self,bucket,key,content, vclock = None, **kwargs):
         return put(bucket,key,content, vclock, kwargs)
-    
+
     def put(self,bucket,key,content, vclock = None, **kwargs):
         code = pack('B',MSG_CODE_PUT_REQ)
         request = RpbPutReq()
@@ -323,13 +323,22 @@ class RiakPBC(Int32StringReceiver):
         if self.timeoutd and not self.timeoutd.called:
             self.timeoutd.cancel()  # stop timeout from beeing raised
 
+        def returOrRaiseException(msg):
+            exc = RiakPBCException(msg)
+            if self.factory.d.called:
+                raise exc
+            else:
+                self.factory.d.errback(Failure(exc))
+
+
         # decode messagetype
         code = unpack('B',data[:1])[0]
         if self.debug:
             print "[%s] stringReceived code %s" % (self.__class__.__name__,self.PBMessageTypes[code])
 
         if code not in self.riakResponses and code not in self.nonMessages:
-            raise RiakPBCException('unknown messagetype: %d' % code)
+            #raise RiakPBCException('unknown messagetype: %d' % code)
+            returnOrRaiseException('unknown messagetype: %d' % code)
 
         elif code in self.nonMessages:
             # for instance ping doesnt have a message, so we just return True
@@ -367,7 +376,8 @@ class RiakPBC(Int32StringReceiver):
                     print "[%s] %s %s" % (self.__class__.__name__,  response.__class__.__name__, str(response).replace('\n',' ' ))
 
                 if code == MSG_CODE_ERROR_RESP:
-                    raise RiakPBCException('%s (%d)' % (response.errmsg, response.errcode))
+                    returnOrRaiseException('%s (%d)' % (response.errmsg, response.errcode))
+                    #raise RiakPBCException('%s (%d)' % (response.errmsg, response.errcode))
 
             if not self.factory.d.called:
                 self.factory.d.callback(response)
