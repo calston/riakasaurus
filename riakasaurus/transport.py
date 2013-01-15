@@ -55,7 +55,12 @@ class ITransport(Interface):
         """
         store a riak_object
         """
-
+        
+    def put_new(self, robj, w=None, dw=None, pw=None, return_body=True, if_none_match=False):
+        """
+        store a riak_object and generate a key for it
+        """
+        
     def get(self, robj, r = None, pr = None, vtag = None):
         """
         fetch a key from the server
@@ -1040,8 +1045,23 @@ class PBCTransport(FeatureDetection):
         """on shutdown, close all transports"""
         self.quit()
 
-    @defer.inlineCallbacks
     def put(self, robj, w = None, dw = None, pw = None, return_body = True, if_none_match=False):
+        ret = self.__put(robj, w, dw, pw, return_body = return_body, if_none_match = if_none_match)
+        if return_body:
+            return ret
+        else:
+            return None
+
+    def put_new(self, robj, w=None, dw=None, pw=None, return_body=True, if_none_match=False):
+        ret = self.__put(robj, w, dw, pw, return_body = return_body, if_none_match = if_none_match)
+        if return_body:
+            return ret
+        else:
+            return (ret[0],None,None)
+
+        
+    @defer.inlineCallbacks
+    def __put(self, robj, w = None, dw = None, pw = None, return_body=True, if_none_match=False):
         # std kwargs
         kwargs = {'w'             : w,
                   'dw'            : dw,
@@ -1081,11 +1101,8 @@ class PBCTransport(FeatureDetection):
                                   **kwargs
                                   )
         stp.setIdle()
-        if return_body:
-            # defer.returnValue([x.value for x in ret.content])
-            defer.returnValue(self.parseRpbGetResp(ret))
-        else:
-            defer.returnValue(None)
+        defer.returnValue(self.parseRpbGetResp(ret))
+            
 
     @defer.inlineCallbacks
     def get(self, robj, r = None, pr = None, vtag = None):
