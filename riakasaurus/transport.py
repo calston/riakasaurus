@@ -7,10 +7,12 @@ from twisted.internet import defer, reactor, protocol
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IBodyProducer
 from twisted.python import log
+import logging
 
 from distutils.version import StrictVersion
 
 import urllib
+import sys
 import re, csv
 import time
 from cStringIO import StringIO
@@ -32,6 +34,10 @@ from riakasaurus.riak_pb2 import *
 
 MAX_LINK_HEADER_SIZE = 8192 - 8
 
+LOGLEVEL_DEBUG = 1
+LOGLEVEL_TRANSPORT = 2
+LOGLEVEL_TRANSPORT_VERBOSE = 4
+
 versions = {
     1: StrictVersion("1.0.0"),
     1.1: StrictVersion("1.1.0"),
@@ -49,7 +55,12 @@ class ITransport(Interface):
         """
         store a riak_object
         """
-
+        
+    def put_new(self, robj, w=None, dw=None, pw=None, return_body=True, if_none_match=False):
+        """
+        store a riak_object and generate a key for it
+        """
+        
     def get(self, robj, r = None, pr = None, vtag = None):
         """
         fetch a key from the server
@@ -958,9 +969,10 @@ class PBCTransport(FeatureDetection):
     implements(ITransport)
 
     debug = 0
+    logToLevel = logging.INFO
     MAX_TRANSPORTS = 50
     MAX_IDLETIME   = 5*60     # in seconds
-    GC_TIME        = 100        # how often (in seconds) the garbage collection should run
+    GC_TIME        = 120        # how often (in seconds) the garbage collection should run
     timeout        = None
     
     def __init__(self, client):
@@ -982,8 +994,8 @@ class PBCTransport(FeatureDetection):
             if stp.isIdle():
                 stp.setActive()
                 foundOne = True
-                if self.debug:
-                    print "[%s] aquired idle transport[%d]: %s" % (self.__class__.__name__, len(self._transports),stp)
+                if self.debug & LOGLEVEL_TRANSPORT_VERBOSE:
+                    log.msg("[%s] aquired idle transport[%d]: %s" % (self.__class__.__name__, len(self._transports),stp), logLevel = self.logToLevel)
                 defer.returnValue(stp)
         if not foundOne:
             if len(self._transports) > self.MAX_TRANSPORTS:
@@ -998,35 +1010,58 @@ class PBCTransport(FeatureDetection):
             idx = len(self._transports)
             self._transports.append(stp)
             stp.setActive()
-            if self.debug:
-                print "[%s] allocate new transport[%d]: %s" % (self.__class__.__name__, len(self._transports),stp)
+            if self.debug & LOGLEVEL_TRANSPORT:
+                log.msg("[%s] allocate new transport[%d]: %s" % (self.__class__.__name__, len(self._transports),stp), logLevel = self.logToLevel)
             defer.returnValue(stp)
 
     @defer.inlineCallbacks
     def _garbageCollect(self):
-        for idx, stp in enumerate(self._transports):
-            if stp.isIdle() and stp.age() > self.MAX_IDLETIME:
-                yield stp.getTransport().quit()
-                if self.debug:
-                    print "[%s] expire transport[%d] %s" % (self.__class__.__name__, idx,stp)
-                del self._transports[idx]
         self._gc = reactor.callLater(self.GC_TIME, self._garbageCollect)
+        for idx, stp in enumerate(self._transports):
+            if (stp.isIdle() and stp.age() > self.MAX_IDLETIME):
+                yield stp.getTransport().quit()
+                if self.debug & LOGLEVEL_TRANSPORT:
+                    log.msg("[%s] expire idle transport[%d] %s" % (self.__class__.__name__, idx,stp), logLevel = self.logToLevel)
+                    log.msg("[%s] %s" % (self.__class__.__name__, self._transports), logLevel = self.logToLevel)
+                self._transports.remove(stp)
+            elif self.timeout and stp.isActive() and stp.age() > self.timeout:
+                yield stp.getTransport().quit()
+                if self.debug & LOGLEVEL_TRANSPORT:
+                    log.msg("[%s] expire timeouted transport[%d] %s" % (self.__class__.__name__, idx,stp), logLevel = self.logToLevel)
+                    log.msg("[%s] %s" % (self.__class__.__name__, self._transports), logLevel = self.logToLevel)
+                self._transports.remove(stp)
+
         
     @defer.inlineCallbacks
     def quit(self):
         self._gc.cancel()      # cancel the garbage collector
 
         for stp in self._transports:
-            if self.debug:
-                print "[%s] transport[%d].quit() %s" % (self.__class__.__name__, len(self._transports),stp)
+            if self.debug & LOGLEVEL_DEBUG:
+                log.msg("[%s] transport[%d].quit() %s" % (self.__class__.__name__, len(self._transports),stp), logLevel = self.logToLevel)
             yield stp.getTransport().quit()
         
     def __del__(self):
         """on shutdown, close all transports"""
         self.quit()
 
-    @defer.inlineCallbacks
     def put(self, robj, w = None, dw = None, pw = None, return_body = True, if_none_match=False):
+        ret = self.__put(robj, w, dw, pw, return_body = return_body, if_none_match = if_none_match)
+        if return_body:
+            return ret
+        else:
+            return None
+
+    def put_new(self, robj, w=None, dw=None, pw=None, return_body=True, if_none_match=False):
+        ret = self.__put(robj, w, dw, pw, return_body = return_body, if_none_match = if_none_match)
+        if return_body:
+            return ret
+        else:
+            return (ret[0],None,None)
+
+        
+    @defer.inlineCallbacks
+    def __put(self, robj, w = None, dw = None, pw = None, return_body=True, if_none_match=False):
         # std kwargs
         kwargs = {'w'             : w,
                   'dw'            : dw,
@@ -1066,11 +1101,8 @@ class PBCTransport(FeatureDetection):
                                   **kwargs
                                   )
         stp.setIdle()
-        if return_body:
-            # defer.returnValue([x.value for x in ret.content])
-            defer.returnValue(self.parseRpbGetResp(ret))
-        else:
-            defer.returnValue(None)
+        defer.returnValue(self.parseRpbGetResp(ret))
+            
 
     @defer.inlineCallbacks
     def get(self, robj, r = None, pr = None, vtag = None):
@@ -1152,8 +1184,8 @@ class PBCTransport(FeatureDetection):
 
         
         if stats is not None:
-            if self.debug:
-                print "[%s] fetched server version: %s" % (self.__class__.__name__, stats.server_version)
+            if self.debug % LOGLEVEL_DEBUG:
+                log.msg("[%s] fetched server version: %s" % (self.__class__.__name__, stats.server_version), logLevel = self.logToLevel)
             defer.returnValue(stats.server_version)
         else:
             defer.returnValue("0.14.0")
