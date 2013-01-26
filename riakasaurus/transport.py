@@ -50,17 +50,17 @@ class ITransport(Interface):
         """
         list keys for a given bucket
         """
-        
+
     def put(self, robj, w = None, dw = None, pw = None, return_body = True, if_none_match=False):
         """
         store a riak_object
         """
-        
+
     def put_new(self, robj, w=None, dw=None, pw=None, return_body=True, if_none_match=False):
         """
         store a riak_object and generate a key for it
         """
-        
+
     def get(self, robj, r = None, pr = None, vtag = None):
         """
         fetch a key from the server
@@ -70,10 +70,10 @@ class ITransport(Interface):
         """
         delete a key from the bucket
         """
-        
+
     def server_version(self):
         """
-        return cached server version 
+        return cached server version
         """
 
     def _server_version(self):
@@ -101,8 +101,8 @@ class ITransport(Interface):
         """
         get bucket properties
         """
-        
-        
+
+
 class FeatureDetection(object):
     _s_version = None
 
@@ -225,7 +225,7 @@ class StringProducer(object):
 class HTTPTransport(FeatureDetection):
 
     implements(ITransport)
-    
+
     """ HTTP Transport for Riak """
     def __init__(self, client, prefix=None):
         if prefix:
@@ -434,8 +434,8 @@ class HTTPTransport(FeatureDetection):
         defer.returnValue(
             self.parse_body(response, [200, 300, 404])
         )
-        
-        
+
+
     def put(self, robj, w = None, dw = None, pw = None, return_body = True, if_none_match=False):
         """
         Serialize put request and deserialize response
@@ -961,7 +961,7 @@ class StatefulTransport(object):
 
     def age(self):
         return time.time() - self.__used
-        
+
 
 class PBCTransport(FeatureDetection):
     """ Protocoll buffer transport for Riak """
@@ -974,7 +974,7 @@ class PBCTransport(FeatureDetection):
     MAX_IDLETIME   = 5*60     # in seconds
     GC_TIME        = 120        # how often (in seconds) the garbage collection should run
     timeout        = None
-    
+
     def __init__(self, client):
         self._prefix = client._prefix
         self.host = client._host
@@ -1031,7 +1031,7 @@ class PBCTransport(FeatureDetection):
                     log.msg("[%s] %s" % (self.__class__.__name__, self._transports), logLevel = self.logToLevel)
                 self._transports.remove(stp)
 
-        
+
     @defer.inlineCallbacks
     def quit(self):
         self._gc.cancel()      # cancel the garbage collector
@@ -1040,7 +1040,7 @@ class PBCTransport(FeatureDetection):
             if self.debug & LOGLEVEL_DEBUG:
                 log.msg("[%s] transport[%d].quit() %s" % (self.__class__.__name__, len(self._transports),stp), logLevel = self.logToLevel)
             yield stp.getTransport().quit()
-        
+
     def __del__(self):
         """on shutdown, close all transports"""
         self.quit()
@@ -1059,7 +1059,7 @@ class PBCTransport(FeatureDetection):
         else:
             return (ret[0],None,None)
 
-        
+
     @defer.inlineCallbacks
     def __put(self, robj, w = None, dw = None, pw = None, return_body=True, if_none_match=False):
         # std kwargs
@@ -1076,7 +1076,7 @@ class PBCTransport(FeatureDetection):
             'value' : robj.get_encoded_data(),
             'content_type' : robj.get_content_type(),
             }
-        
+
         # links
         links = robj.get_links()
         if links:
@@ -1090,7 +1090,13 @@ class PBCTransport(FeatureDetection):
             for key, value in robj.get_usermeta().iteritems():
                 payload['usermeta'].append((key, value))
 
-                
+        # indexes
+        if robj.get_indexes():
+            payload['indexes'] = []
+            for index in robj.get_indexes():
+                payload['indexes'].append((index.get_field(), index.get_value()))
+
+
         # aquire transport, fire, release
         stp = yield self._getFreeTransport()
         transport = stp.getTransport()
@@ -1102,13 +1108,13 @@ class PBCTransport(FeatureDetection):
                                   )
         stp.setIdle()
         defer.returnValue(self.parseRpbGetResp(ret))
-            
+
 
     @defer.inlineCallbacks
     def get(self, robj, r = None, pr = None, vtag = None):
 
         # ***FIXME*** whats vtag for? ignored for now
-        
+
         stp = yield self._getFreeTransport()
         transport = stp.getTransport()
         ret = yield transport.get(robj.get_bucket().get_name(),
@@ -1166,7 +1172,7 @@ class PBCTransport(FeatureDetection):
         stp.setIdle()
         defer.returnValue([x for x in ret.buckets])
 
-        
+
     @defer.inlineCallbacks
     def server_version(self):
         if not self._s_version:
@@ -1182,7 +1188,7 @@ class PBCTransport(FeatureDetection):
         stats = yield transport.getServerInfo()
         stp.setIdle()
 
-        
+
         if stats is not None:
             if self.debug % LOGLEVEL_DEBUG:
                 log.msg("[%s] fetched server version: %s" % (self.__class__.__name__, stats.server_version), logLevel = self.logToLevel)
@@ -1225,7 +1231,7 @@ class PBCTransport(FeatureDetection):
         stp.setIdle()
         defer.returnValue({'n_val'      : ret.props.n_val,
                            'allow_mult' : ret.props.allow_mult})
-        
+
     @defer.inlineCallbacks
     def get_keys(self, bucket):
         stp = yield self._getFreeTransport()
@@ -1266,7 +1272,7 @@ class PBCTransport(FeatureDetection):
                 metadata[MD_USERMETA] = {}
                 for md in content.usermeta:
                     metadata[MD_USERMETA][md.key] = md.value
-                    
+
             if len(content.indexes):
                 metadata[MD_INDEX] = []
                 for ie in content.indexes:
@@ -1274,17 +1280,17 @@ class PBCTransport(FeatureDetection):
             resList.append((metadata, data))
         return vclock, resList
 
-            
+
     def decodeJson(self, s):
         return self.client.get_decoder('application/json')(s)
 
     def encodeJson(self, s):
         return self.client.get_encoder('application/json')(s)
-        
+
     # def deferred_sleep(self,secs):
     #     """
     #     fake deferred sleep
-        
+
     #     @param secs: time to sleep
     #     @type secs: float
     #     """
