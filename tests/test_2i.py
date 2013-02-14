@@ -78,14 +78,10 @@ class Tests(unittest.TestCase):
 
         self.assertEqual(r1.get_key(), u'foo2')
 
-        results = yield self.client.index(self.bucket_name, 'field2_int', 1,
-                                          2000).run()
+        results = yield self.bucket.get_index('field2_int', 1,
+                                          2000)
 
-        r1 = []
-        for i in results:
-            r1.append((yield i.get()).get_key())
-
-        self.assertEqual(sorted(r1),
+        self.assertEqual(sorted(results),
                          ['foo1', 'foo2'])
 
         log.msg("done secondary_index")
