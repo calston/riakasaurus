@@ -663,7 +663,7 @@ class RiakObject(object):
         """
         mr = RiakMapReduce(self._client)
         mr.add(self._bucket._name, self._key)
-        return apply(mr.add, args)
+        return mr.add(*args)
 
     def link(self, *args):
         """
@@ -674,7 +674,7 @@ class RiakObject(object):
         """
         mr = RiakMapReduce(self._client)
         mr.add(self._bucket._name, self._key)
-        return apply(mr.link, args)
+        return mr.link(*args)
 
     def map(self, *args):
         """
@@ -685,7 +685,7 @@ class RiakObject(object):
         """
         mr = RiakMapReduce(self._client)
         mr.add(self._bucket._name, self._key)
-        return apply(mr.map, args)
+        return mr.map(*args)
 
     def reduce(self, params):
         """
@@ -696,7 +696,7 @@ class RiakObject(object):
         """
         mr = RiakMapReduce(self._client)
         mr.add(self._bucket._name, self._key)
-        return apply(mr.reduce, params)
+        return mr.reduce(*params)
 
     def add_meta_data(self, key, data):
         """

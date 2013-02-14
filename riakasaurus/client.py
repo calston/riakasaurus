@@ -254,7 +254,7 @@ class RiakClient(object):
         :returns: RiakMapReduce
         """
         mr = mapreduce.RiakMapReduce(self)
-        return apply(mr.add, args)
+        return mr.add(*args)
 
     def search(self, *args):
         """
@@ -262,7 +262,7 @@ class RiakClient(object):
         see RiakMapReduce.search()
         """
         mr = mapreduce.RiakMapReduce(self)
-        return apply(mr.search, args)
+        return mr.search(*args)
 
     def link(self, args):
         """
@@ -271,7 +271,7 @@ class RiakClient(object):
         :returns: RiakMapReduce
         """
         mr = mapreduce.RiakMapReduce(self)
-        return apply(mr.link, args)
+        return mr.link(*args)
 
     def list_buckets(self):
         """
@@ -290,7 +290,7 @@ class RiakClient(object):
         :rtype: :class:`RiakMapReduce`
         """
         mr = mapreduce.RiakMapReduce(self)
-        return apply(mr.index, args)
+        return mr.index(*args)
 
     def map(self, *args):
         """
@@ -299,7 +299,7 @@ class RiakClient(object):
         :returns: RiakMapReduce
         """
         mr = mapreduce.RiakMapReduce(self)
-        return apply(mr.map, args)
+        return mr.map(*args)
 
     def reduce(self, *args):
         """
@@ -308,7 +308,7 @@ class RiakClient(object):
         :returns: RiakMapReduce
         """
         mr = mapreduce.RiakMapReduce(self)
-        return apply(mr.reduce, args)
+        return mr.reduce(*args)
 
     def solr(self):
         if self._solr is None:
