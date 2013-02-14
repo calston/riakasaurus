@@ -268,8 +268,11 @@ class RiakPBC(Int32StringReceiver):
         request = RpbSetBucketReq()
         request.bucket = bucket
 
-        if 'n_val' in kwargs      : request.props.n_val = kwargs['n_val']
-        if 'allow_mult' in kwargs : request.props.allow_mult = kwargs['allow_mult']
+        for k, v in kwargs.items():
+            if k in ['n_val', 'allow_mult']:
+                setattr(request.props, k, v)
+            else:
+                raise RiakPBCException("Property not implemented: %s" % k)
 
         return self.__send(code,request)
 
