@@ -558,7 +558,7 @@ class RiakBucket(object):
         """
         Queries a secondary index over objects in this bucket, returning keys.
         """
-        return self._client._transport.get_index(self._name, index, startkey, endkey)
+        return self._client.transport.get_index(self._name, index, startkey, endkey)
 
     def list_keys(self):
         """ Same as get_keys - for txRiak compat """
