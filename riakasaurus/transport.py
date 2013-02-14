@@ -1191,7 +1191,9 @@ class PBCTransport(FeatureDetection):
 
         if stats is not None:
             if self.debug % LOGLEVEL_DEBUG:
-                log.msg("[%s] fetched server version: %s" % (self.__class__.__name__, stats.server_version), logLevel = self.logToLevel)
+                log.msg("[%s] fetched server version: %s" % (
+                    self.__class__.__name__, stats.server_version
+                ), logLevel = self.logToLevel)
             defer.returnValue(stats.server_version)
         else:
             defer.returnValue("0.14.0")
@@ -1256,12 +1258,23 @@ class PBCTransport(FeatureDetection):
         for content in res.content: # iterate over RpbContent field
             metadata = {MD_USERMETA: {}, MD_INDEX: []}
             data = content.value
-            if content.HasField('content_type'): metadata[MD_CTYPE] = content.content_type
-            if content.HasField('charset'): metadata[MD_CHARSET] = content.charset
-            if content.HasField('content_encoding'): metadata[MD_ENCODING] = content.content_encoding
-            if content.HasField('vtag'): metadata[MD_VTAG] = content.vtag
-            if content.HasField('last_mod'): metadata[MD_LASTMOD] = content.last_mod
-            if content.HasField('deleted'): metadata[MD_DELETED] = content.deleted
+            if content.HasField('content_type'): 
+                metadata[MD_CTYPE] = content.content_type
+
+            if content.HasField('charset'): 
+                metadata[MD_CHARSET] = content.charset
+
+            if content.HasField('content_encoding'): 
+                metadata[MD_ENCODING] = content.content_encoding
+
+            if content.HasField('vtag'): 
+                metadata[MD_VTAG] = content.vtag
+
+            if content.HasField('last_mod'): 
+                metadata[MD_LASTMOD] = content.last_mod
+
+            if content.HasField('deleted'): 
+                metadata[MD_DELETED] = content.deleted
 
             if len(content.links):
                 metadata[MD_LINKS] = []
