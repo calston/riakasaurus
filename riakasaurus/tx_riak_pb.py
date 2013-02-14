@@ -203,16 +203,20 @@ class RiakPBC(Int32StringReceiver):
                     indexes = request.content.indexes.add()
                     indexes.key,indexes.value = l
 
+        
+        for i in ['w', 'dw', 'pw']:
+            if i in kwargs:
+                setattr(request, i, self._resolveNums(kwargs[i]))
 
-        if 'w' in kwargs               : request.w = self._resolveNums(kwargs['w'])
-        if 'dw' in kwargs              : request.dw = self._resolveNums(kwargs['dw'])
-        if 'return_body' in kwargs     : request.return_body = kwargs['return_body']
-        if 'pw' in kwargs              : request.pw = self._resolveNums(kwargs['pw'])
-        if 'if_modified' in kwargs     : request.if_modified = kwargs['if_modified']
-        if 'if_not_modified' in kwargs : request.if_not_modified = kwargs['if_not_modified']
-        if 'if_none_match' in kwargs   : request.if_none_match = kwargs['if_none_match']
-        if 'return_head' in kwargs     : request.return_head = kwargs['return_head']
+        params = [
+            'if_modified','if_not_modified', 'if_none_match', 
+            'return_head', 'return_body'
+        ]
 
+        for i in params:
+            if i in kwargs:
+                setattr(request, i, kwargs[i])
+            
         if vclock:
             request.vclock = vclock
 
