@@ -224,14 +224,13 @@ class RiakPBC(Int32StringReceiver):
         request.bucket = bucket
         request.key = key
 
+
         if 'vclock' in kwargs and kwargs['vclock']:
             request.vclock = kwargs['vclock']
-        if 'rw' in kwargs     : request.rw = self._resolveNums(kwargs['rw'])
-        if 'r' in kwargs      : request.r = self._resolveNums(kwargs['r'])
-        if 'w' in kwargs      : request.w = self._resolveNums(kwargs['w'])
-        if 'pr' in kwargs     : request.pr = self._resolveNums(kwargs['pr'])
-        if 'pw' in kwargs     : request.pw = self._resolveNums(kwargs['pw'])
-        if 'dw' in kwargs     : request.dw = self._resolveNums(kwargs['dw'])
+
+        for prop in ['rw', 'r', 'w', 'pr', 'pw', 'dw']:
+            if prop in kwargs:
+                setattr(request, prop, self._resolveNums(kwargs[prop]))
 
         return self.__send(code,request)
 
