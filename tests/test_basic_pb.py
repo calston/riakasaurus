@@ -36,3 +36,9 @@ class Tests_PB(Tests):
     def tearDown(self):
         # shut down pb connection explicitly
         yield self.client.get_transport().quit()
+
+
+    @defer.inlineCallbacks
+    def test_is_alive(self):
+        alive = yield self.client.is_alive()
+        self.assertEqual(alive, True)
