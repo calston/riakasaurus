@@ -72,6 +72,7 @@ class RiakPBC(Int32StringReceiver):
         MSG_CODE_LIST_BUCKETS_RESP    : RpbListBucketsResp,
         MSG_CODE_GET_BUCKET_RESP      : RpbGetBucketResp,
         MSG_CODE_GET_SERVER_INFO_RESP : RpbGetServerInfoResp,
+        MSG_CODE_INDEX_RESP           : RpbIndexResp,
         }
 
     PBMessageTypes = {
@@ -162,6 +163,21 @@ class RiakPBC(Int32StringReceiver):
         if 'deletedvclock' in kwargs: request.deletedvclock = kwargs['deletedvclock']
 
         return self.__send(code,request)
+
+    def get_index(self, bucket, index, startkey, endkey=None):
+        code = pack('B', MSG_CODE_INDEX_REQ)
+        req = RpbIndexReq(bucket=bucket, index=index)
+        if endkey:
+            req.qtype = RpbIndexReq.range
+            req.range_min = str(startkey)
+            req.range_max = str(endkey)
+        else:
+            req.qtype = RpbIndexReq.eq
+            req.key = str(startkey)
+
+        d = self.__send(code, req)
+        d.addCallback(lambda resp: resp.keys)
+        return d
 
     def put_new(self,bucket,key,content, vclock = None, **kwargs):
         return put(bucket,key,content, vclock, kwargs)
