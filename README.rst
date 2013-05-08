@@ -3,6 +3,10 @@ Riakasaurus
 
 A Riak client library for Twisted
 
+|riakasaurus-ci|_
+
+.. |riakasaurus-ci| image:: https://travis-ci.org/calston/riakasaurus.png?branch=master
+.. _riakasaurus-ci: https://travis-ci.org/calston/riakasaurus
 
 Installation
 -----
