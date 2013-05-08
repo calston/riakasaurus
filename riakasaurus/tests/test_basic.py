@@ -5,8 +5,6 @@ riakasaurus _must_ be on your PYTHONPATH
 
 """
 
-import json
-import random
 from twisted.trial import unittest
 from twisted.python import log
 from twisted.internet import defer
