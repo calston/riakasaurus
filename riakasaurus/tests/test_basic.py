@@ -124,8 +124,8 @@ class Tests_HTTP(unittest.TestCase, BasicTestsMixin):
             yield self.bucket.reset_properties()
         except Exception, e:
             if 'not supported' in str(e):
-                log.msg('skipping reset_bucket_properties')
-                return
+                log.msg('skip reset_bucket_properties')
+                raise unittest.SkipTest('bucket.reset_properties() not supported')
             raise
         # Get default n_val...
         default_n_val = yield self.bucket.get_n_val()
