@@ -18,11 +18,7 @@ from riakasaurus.riak_index_entry import RiakIndexEntry
 from riakasaurus.mapreduce import RiakLink
 
 # protobuf
-from riakasaurus.tx_riak_pb import RiakPBCClient
-from riakasaurus.riak_kv_pb2 import *
-from riakasaurus.riak_pb2 import *
-
-from riakasaurus.transport import transport
+from riakasaurus.transport import transport, pbc
 
 LOGLEVEL_DEBUG = 1
 LOGLEVEL_TRANSPORT = 2
@@ -101,7 +97,7 @@ class PBCTransport(transport.FeatureDetection):
 
             # nothin free, create a new protocol instance, append
             # it to self._transports and return it
-            transport = yield RiakPBCClient().connect(self.host, self.port)
+            transport = yield pbc.RiakPBCClient().connect(self.host, self.port)
             if self.timeout:
                 transport.setTimeout(self.timeout)
             stp = StatefulTransport(transport)
