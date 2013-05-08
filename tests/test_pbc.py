@@ -7,10 +7,9 @@ from twisted.trial import unittest
 from twisted.internet import defer
 from twisted.python import log
 
-from riakasaurus.tx_riak_pb import RiakPBCClient
-from riakasaurus.riak_kv_pb2 import *
-from riakasaurus.riak_pb2 import *
+from riakasaurus.transport import pbc
 
+from riakasaurus import riak, transport
 
 VERBOSE = False
 # uncomment to activate logging
@@ -22,7 +21,7 @@ class Test_PBCClient(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        self.client = yield RiakPBCClient().connect('127.0.0.1', 8087)
+        self.client = yield pbc.RiakPBCClient().connect('127.0.0.1', 8087)
         self.client.debug = 0
 
     @defer.inlineCallbacks
@@ -48,14 +47,14 @@ class Test_PBCClient(unittest.TestCase):
     def test_getServerInfo(self):
         log.msg("*** testing getServerInfo")
         info = yield self.client.getServerInfo()
-        self.assertTrue(isinstance(info, RpbGetServerInfoResp))
+        self.assertTrue(isinstance(info, pbc.RpbGetServerInfoResp))
         log.msg("done testing getServerInfo")
         
     @defer.inlineCallbacks
     def test_put(self):
         log.msg("*** testing put")
         put = yield self.client.put('bucket','key', 'foo')
-        self.assertTrue(isinstance(put, RpbPutResp))
+        self.assertTrue(isinstance(put, pbc.RpbPutResp))
        
         log.msg("done testing put")
 
@@ -63,10 +62,10 @@ class Test_PBCClient(unittest.TestCase):
     def test_get(self):
         log.msg("*** testing get")
         put = yield self.client.put('bucket','key', 'foo')
-        self.assertTrue(isinstance(put, RpbPutResp))
+        self.assertTrue(isinstance(put, pbc.RpbPutResp))
        
         result = yield self.client.get('bucket','key')
-        self.assertTrue(isinstance(result, RpbGetResp))
+        self.assertTrue(isinstance(result, pbc.RpbGetResp))
         self.assertEqual(result.content[0].value,'foo')
        
         log.msg("done testing get")
@@ -76,19 +75,19 @@ class Test_PBCClient(unittest.TestCase):
         log.msg("*** testing update")
         # make sure "foo" is in
         put = yield self.client.put('bucket','key', 'foo')
-        self.assertTrue(isinstance(put, RpbPutResp))
+        self.assertTrue(isinstance(put, pbc.RpbPutResp))
 
         # retrieve it
         result = yield self.client.get('bucket','key')
-        self.assertTrue(isinstance(result, RpbGetResp))
+        self.assertTrue(isinstance(result, pbc.RpbGetResp))
         self.assertEqual(result.content[0].value,'foo')
 
         result2 = yield self.client.put('bucket','key','bla',result.vclock)
-        self.assertTrue(isinstance(result2, RpbPutResp))
+        self.assertTrue(isinstance(result2, pbc.RpbPutResp))
 
         # retrieve updated
         result = yield self.client.get('bucket','key')
-        self.assertTrue(isinstance(result, RpbGetResp))
+        self.assertTrue(isinstance(result, pbc.RpbGetResp))
         self.assertEqual(result.content[0].value,'bla')
         
         log.msg("done testing update")
@@ -100,7 +99,7 @@ class Test_PBCClient(unittest.TestCase):
 
         # make sure "foo" is in
         put = yield self.client.put('bucket','delete_key', 'foo')
-        self.assertTrue(isinstance(put, RpbPutResp))
+        self.assertTrue(isinstance(put, pbc.RpbPutResp))
 
         # remove it
         result = yield self.client.delete('bucket','delete_key')
@@ -108,7 +107,7 @@ class Test_PBCClient(unittest.TestCase):
 
         # try to fetch it
         result = yield self.client.get('bucket','delete_key')
-        self.assertTrue(isinstance(result, RpbGetResp))
+        self.assertTrue(isinstance(result, pbc.RpbGetResp))
         self.assertEqual(len(result.content),0)
         log.msg("done testing delete")
 
@@ -130,7 +129,7 @@ class Test_PBCClient(unittest.TestCase):
 
         # make sure "foo" is in
         put = yield self.client.put('bucket','key', 'foo')
-        self.assertTrue(isinstance(put, RpbPutResp))
+        self.assertTrue(isinstance(put, pbc.RpbPutResp))
         
         # get existing buckets message
         res = yield self.client.getBuckets()
@@ -145,7 +144,7 @@ class Test_PBCClient(unittest.TestCase):
 
         # make sure "foo" is in
         put = yield self.client.put('anotherbucket','key', 'foo')
-        self.assertTrue(isinstance(put, RpbPutResp))
+        self.assertTrue(isinstance(put, pbc.RpbPutResp))
         
         # get existing buckets message
         res = yield self.client.setBucketProperties('anotherbucket', n_val=2, allow_mult = True)
@@ -175,11 +174,11 @@ class Test_PBCClient(unittest.TestCase):
                                ]
                    }
         put = yield self.client.put('bucket','key', content, vclock = head.vclock)
-        self.assertTrue(isinstance(put, RpbPutResp))
+        self.assertTrue(isinstance(put, pbc.RpbPutResp))
 
         # retrieve it
         result = yield self.client.get('bucket','key')
-        self.assertTrue(isinstance(result, RpbGetResp))
+        self.assertTrue(isinstance(result, pbc.RpbGetResp))
 
         self.assertEqual(result.content[0].value,'foo')
         self.assertEqual(result.content[0].content_type,'text/text')

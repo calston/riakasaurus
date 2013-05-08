@@ -1,10 +1,6 @@
 from twisted.internet import defer, reactor
 from twisted.python import log
 
-from riakasaurus.tx_riak_pb import RiakPBCClient
-from riakasaurus.riak_kv_pb2 import *
-from riakasaurus.riak_pb2 import *
-
 from test_basic import Tests
 from riakasaurus import riak, transport
 
