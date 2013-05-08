@@ -10,6 +10,7 @@ import random
 from twisted.trial import unittest
 from twisted.python import log
 from twisted.internet import defer
+from distutils.version import StrictVersion
 
 VERBOSE = False
 
@@ -22,26 +23,11 @@ from riakasaurus import riak
 RIAK_CLIENT_ID = 'TEST'
 BUCKET_PREFIX = 'riakasaurus.tests.'
 
-class Tests(unittest.TestCase):
-    """
-    trial unit tests.
-    """
+
+class BasicTestsMixin(object):
 
     test_keys = ['foo', 'foo1', 'foo2', 'foo3', 'bar', 'baz', 'ba_foo1',
                  'blue_foo1']
-
-    @defer.inlineCallbacks
-    def setUp(self):
-        self.client = riak.RiakClient(client_id=RIAK_CLIENT_ID)
-        self.bucket_name = BUCKET_PREFIX + self.id().rsplit('.', 1)[-1]
-        self.bucket = self.client.bucket(self.bucket_name)
-        yield self.bucket.enable_search()
-        yield self.bucket.purge_keys()
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        yield self.bucket.disable_search()
-        yield self.bucket.purge_keys()
 
     @defer.inlineCallbacks
     def test_head(self):
@@ -110,3 +96,59 @@ class Tests(unittest.TestCase):
         self.assertEqual(n_val, 2)
         log.msg('done set_bucket_properties')
 
+
+class Tests_HTTP(unittest.TestCase, BasicTestsMixin):
+    """
+    trial unit tests.
+    """
+
+    @defer.inlineCallbacks
+    def setUp(self):
+        self.client = riak.RiakClient(client_id=RIAK_CLIENT_ID)
+        self.bucket_name = BUCKET_PREFIX + self.id().rsplit('.', 1)[-1]
+        self.bucket = self.client.bucket(self.bucket_name)
+        yield self.bucket.enable_search()
+        yield self.bucket.purge_keys()
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self.bucket.disable_search()
+        yield self.bucket.purge_keys()
+
+    @defer.inlineCallbacks
+    def test_reset_bucket_properties(self):
+        """manipulate bucket properties"""
+        log.msg('*** reset_bucket_properties')
+        try:
+            # Reset bucket properties...
+            yield self.bucket.reset_properties()
+        except Exception, e:
+            if 'not supported' in str(e):
+                log.msg('skipping reset_bucket_properties')
+                return
+            raise
+        # Get default n_val...
+        default_n_val = yield self.bucket.get_n_val()
+        # Set new n_val...
+        yield self.bucket.set_n_val(default_n_val + 1)
+        n_val = yield self.bucket.get_n_val()
+        self.assertEqual(n_val, default_n_val + 1)
+        # Test resetting properties again...
+        yield self.bucket.reset_properties()
+        n_val = yield self.bucket.get_n_val()
+        self.assertEqual(n_val, default_n_val)
+        log.msg('done reset_bucket_properties')
+
+    @defer.inlineCallbacks
+    def test_reset_bucket_properties_not_available(self):
+        """manipulate bucket properties"""
+        log.msg('*** reset_bucket_properties_not_available')
+        self.patch(self.client.transport, 'server_version', lambda: StrictVersion('1.2.0'))
+        try:
+            # Test resetting bucket properties...
+            yield self.bucket.reset_properties()
+            self.fail('Expected "not supported" exception, got nothing.')
+        except Exception, e:
+            if 'not supported' not in str(e):
+                raise
+        log.msg('done reset_bucket_properties_not_available')

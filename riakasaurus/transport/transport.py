@@ -7,7 +7,8 @@ from distutils.version import StrictVersion
 versions = {
     1: StrictVersion("1.0.0"),
     1.1: StrictVersion("1.1.0"),
-    1.2: StrictVersion("1.2.0")
+    1.2: StrictVersion("1.2.0"),
+    1.3: StrictVersion("1.3.0"),
     }
 
 
@@ -79,6 +80,15 @@ class FeatureDetection(object):
         :rtype string
         """
         raise NotImplementedError
+
+    @defer.inlineCallbacks
+    def has_reset_bucket_props_api(self):
+        """
+        Whether resetting of bucket properties is supported.
+        :rtype bool
+        """
+        d = yield self.server_version()
+        defer.returnValue(d >= versions[1.3])
 
     @defer.inlineCallbacks
     def phaseless_mapred(self):

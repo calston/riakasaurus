@@ -435,6 +435,23 @@ class HTTPTransport(transport.FeatureDetection):
             raise Exception('Error getting bucket properties.')
 
     @defer.inlineCallbacks
+    def reset_bucket_props(self, bucket):
+        """
+        Reset properties for a bucket
+        """
+        rbp = yield self.has_reset_bucket_props_api()
+        if not rbp:
+            raise Exception('Resetting of bucket properties is not supported by this Riak node')
+
+        # Run the request...
+        url = self.build_rest_path(bucket, 'props', prefix='buckets')
+        response = yield self.http_request('DELETE', url)
+
+        headers = response[0]
+        if headers['http_code'] != 204:
+            raise Exception('Error resetting bucket properties.')
+
+    @defer.inlineCallbacks
     def mapred(self, inputs, query, timeout=None):
         """
         Run a MapReduce query.
