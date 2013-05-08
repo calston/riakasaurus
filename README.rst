@@ -3,7 +3,6 @@ Riakasaurus
 
 A Riak client library for Twisted
 
-Riakasaurus is based on my fork of txriak from https://bitbucket.org/asi/txriak, which in turn draws most of it's work from the Riak python library by Basho. 
 
 Installation
 -----
@@ -14,7 +13,10 @@ From source
     # python setup.py install
 
 From PyPi
-    # easy_install riakasauru
+    # easy_install riakasaurus
+
+From pip
+    # pip install riakasaurus
 
 
 Usage
@@ -53,4 +55,6 @@ Thank you to these people for their previous contributions to txriak and Riakasa
  * Simon Cross - Solr search and restructuring many things 
  * Steffen Oschatz (https://github.com/tobixx) - Various patches
  * Jason J. W. Williams 
+ * David Novakovic
+ * Andreas Pfotenhauer
  * Appropriate Solutions - For the origional txriak work
