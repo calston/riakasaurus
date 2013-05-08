@@ -491,6 +491,14 @@ class RiakBucket(object):
         """
         return self._client.transport.get_bucket_props(self)
 
+    def reset_properties(self):
+        """
+        Reset all bucket properties to defaults.
+
+        :rtype: None - deferred
+        """
+        return self._client.transport.reset_bucket_props(self)
+
     def get_keys(self):
         """
         Return all keys within the bucket.

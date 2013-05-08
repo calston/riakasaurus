@@ -1,7 +1,8 @@
 from twisted.internet import defer, reactor
 from twisted.python import log
+from twisted.trial import unittest
 
-from test_basic import Tests
+from test_basic import BasicTestsMixin
 from riakasaurus import riak, transport
 
 RIAK_CLIENT_ID = 'TEST'
@@ -14,7 +15,7 @@ if VERBOSE:
     log.startLogging(sys.stderr)
 
 
-class Tests_PB(Tests):
+class Tests_PB(unittest.TestCase, BasicTestsMixin):
 
     @defer.inlineCallbacks
     def setUp(self):
