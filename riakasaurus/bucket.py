@@ -507,7 +507,7 @@ class RiakBucket(object):
 
            At current, this is a very expensive operation. Use with caution.
         """
-        return self._client.get_transport().get_keys(self)
+        return self._client.transport.get_keys(self)
 
     def new_binary_from_file(self, key, filename):
         """
