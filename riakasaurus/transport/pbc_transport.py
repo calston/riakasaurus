@@ -16,6 +16,7 @@ from riakasaurus.metadata import *
 
 from riakasaurus.riak_index_entry import RiakIndexEntry
 from riakasaurus.mapreduce import RiakLink
+from riakasaurus import exceptions
 
 # protobuf
 from riakasaurus.transport import transport, pbc
@@ -67,7 +68,6 @@ class PBCTransport(transport.FeatureDetection):
     MAX_TRANSPORTS = 50
     MAX_IDLETIME   = 5*60     # in seconds
     GC_TIME        = 120        # how often (in seconds) the garbage collection should run
-    timeout        = None
 
     def __init__(self, client):
         self._prefix = client._prefix
@@ -77,6 +77,7 @@ class PBCTransport(transport.FeatureDetection):
         self._client_id = None
         self._transports = []    # list of transports, empty on start
         self._gc = reactor.callLater(self.GC_TIME, self._garbageCollect)
+        self.timeout = client.request_timeout
 
     def setTimeout(self,t):
         self.timeout = t
@@ -87,6 +88,7 @@ class PBCTransport(transport.FeatureDetection):
         for stp in self._transports:
             if stp.isIdle():
                 stp.setActive()
+                stp.getTransport().setTimeout(self.timeout)
                 foundOne = True
                 if self.debug & LOGLEVEL_TRANSPORT_VERBOSE:
                     log.msg("[%s] aquired idle transport[%d]: %s" % (self.__class__.__name__, len(self._transports),stp), logLevel = self.logToLevel)

@@ -25,7 +25,8 @@ class RiakClient(object):
     def __init__(self, host='127.0.0.1', port=8098,
                 prefix='riak', mapred_prefix='mapred',
                 client_id=None, r_value="default", w_value="default", dw_value="default",
-                transport=transport.HTTPTransport):
+                transport=transport.HTTPTransport,
+                request_timeout=None):
         """
         Construct a new RiakClient object.
 
@@ -54,7 +55,12 @@ class RiakClient(object):
                           'text/json': json.loads}
         self._solr = None
 
-        self.transport = transport(self) 
+        self.request_timeout = request_timeout
+
+        self.transport = transport(self)
+
+    def setRequestTimeout(self, timeout):
+        self.request_timeout = timeout
 
     def get_transport(self):
         return self.transport

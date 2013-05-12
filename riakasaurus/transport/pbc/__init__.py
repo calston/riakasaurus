@@ -10,6 +10,7 @@ from pprint import pformat
 
 # generated code from *.proto message definitions
 from riakasaurus.transport.pbc import riak_kv_pb2, riak_pb2
+from riakasaurus import exceptions
 
 ## Protocol codes
 MSG_CODE_ERROR_RESP = 0
@@ -70,9 +71,6 @@ RpbGetServerInfoResp = riak_pb2.RpbGetServerInfoResp
 RpbPair = riak_pb2.RpbPair
 
 
-
-class RiakPBCException(Exception):
-    pass
 
 def toHex(s):
     lst = []
@@ -318,7 +316,7 @@ class RiakPBC(Int32StringReceiver):
             if k in ['n_val', 'allow_mult']:
                 setattr(request.props, k, v)
             else:
-                raise RiakPBCException("Property not implemented: %s" % k)
+                raise exceptions.RiakPBCException("Property not implemented: %s" % k)
 
         return self.__send(code,request)
 
@@ -341,7 +339,8 @@ class RiakPBC(Int32StringReceiver):
         helper method for logging, sending and returning the deferred
         """
         if self.debug:
-            print "[%s] %s %s" % (self.__class__.__name__,  request.__class__.__name__, str(request).replace('\n',' ' ))
+            print "[%s] %s %s" % (self.__class__.__name__,  
+                request.__class__.__name__, str(request).replace('\n',' ' ))
         if request:
             msg = code + request.SerializeToString()
         else:
@@ -349,14 +348,15 @@ class RiakPBC(Int32StringReceiver):
         self.sendString(msg)
         self.factory.d = Deferred()
         if self.timeout:
-            self.timeoutd = reactor.callLater(self.timeout, self._triggerTimeout)
+            self.timeoutd = reactor.callLater(self.timeout, 
+                self._triggerTimeout)
 
         return self.factory.d
 
     def _triggerTimeout(self):
         if not self.factory.d.called:
             try:
-                self.factory.d.errback(RiakPBCException('timeout'))
+                self.factory.d.errback(exceptions.RequestTimeout('timeout'))
             except Exception, e:
                 print "Unable to handle Timeout: %s" % e
 
@@ -368,11 +368,11 @@ class RiakPBC(Int32StringReceiver):
         messages that dont have a body to parse return True, those are
         listed in self.nonMessages
         """
-        if self.timeoutd and not self.timeoutd.called:
+        if self.timeoutd and self.timeoutd.active():
             self.timeoutd.cancel()  # stop timeout from beeing raised
 
         def returOrRaiseException(msg):
-            exc = RiakPBCException(msg)
+            exc = exceptions.RiakPBCException(msg)
             if self.factory.d.called:
                 raise exc
             else:
@@ -382,16 +382,17 @@ class RiakPBC(Int32StringReceiver):
         # decode messagetype
         code = unpack('B',data[:1])[0]
         if self.debug:
-            print "[%s] stringReceived code %s" % (self.__class__.__name__,self.PBMessageTypes[code])
+            print "[%s] stringReceived code %s" % (self.__class__.__name__,
+                self.PBMessageTypes[code])
 
         if code not in self.riakResponses and code not in self.nonMessages:
-            #raise RiakPBCException('unknown messagetype: %d' % code)
             returnOrRaiseException('unknown messagetype: %d' % code)
 
         elif code in self.nonMessages:
             # for instance ping doesnt have a message, so we just return True
             if self.debug:
-                print "[%s] stringReceived empty message type %s" % (self.__class__.__name__, self.PBMessageTypes[code])
+                print "[%s] stringReceived empty message type %s" % (
+                    self.__class__.__name__, self.PBMessageTypes[code])
             if not self.factory.d.called:
                 self.factory.d.callback(True)
             return
@@ -425,7 +426,6 @@ class RiakPBC(Int32StringReceiver):
 
                 if code == MSG_CODE_ERROR_RESP:
                     returnOrRaiseException('%s (%d)' % (response.errmsg, response.errcode))
-                    #raise RiakPBCException('%s (%d)' % (response.errmsg, response.errcode))
 
             if not self.factory.d.called:
                 self.factory.d.callback(response)
@@ -436,7 +436,7 @@ class RiakPBC(Int32StringReceiver):
             if val in self.rwNums:
                 return self.rwNums[val]
             else:
-                raise RiakPBCException('invalid value %s' % (val))
+                raise exceptions.RiakPBCException('invalid value %s' % (val))
         else:
             return val
 

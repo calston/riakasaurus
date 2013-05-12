@@ -5,8 +5,6 @@ riakasaurus _must_ be on your PYTHONPATH
 
 """
 
-import json
-import random
 from twisted.trial import unittest
 from twisted.python import log
 from twisted.internet import defer
@@ -14,7 +12,7 @@ from distutils.version import StrictVersion
 
 VERBOSE = False
 
-from riakasaurus import riak
+from riakasaurus import riak, exceptions
 
 # uncomment to activate logging
 # import sys
@@ -152,3 +150,27 @@ class Tests_HTTP(unittest.TestCase, BasicTestsMixin):
             if 'not supported' not in str(e):
                 raise
         log.msg('done reset_bucket_properties_not_available')
+
+    @defer.inlineCallbacks
+    def test_request_timeout(self):
+        """Timeouts are respected."""
+        log.msg('*** timeout')
+
+        # Set a very short timeout and expect it to trigger.
+        self.client.setRequestTimeout(0.00001)
+        try:
+            yield self.bucket.get_keys()
+            self.fail('Request did not time out.')
+        except exceptions.RequestTimeout:
+            pass
+
+        # Set a long timeout and expect it not to trigger.
+        self.client.setRequestTimeout(1)
+        try:
+            yield self.bucket.get('foo')
+        except exceptions.RequestTimeout:
+            self.fail('Request timed out unexpectedly.')
+
+        self.client.setRequestTimeout(None)
+        log.msg('done timeout')
+
