@@ -92,4 +92,3 @@ class Tests(unittest.TestCase):
         result = yield job.run()
         self.assertEqual(result, [2])
         log.msg('done map_reduce_from_object')
-

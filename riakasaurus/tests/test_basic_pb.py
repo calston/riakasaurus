@@ -22,7 +22,7 @@ class Tests_PB(unittest.TestCase, BasicTestsMixin):
         self.client = riak.RiakClient(client_id=RIAK_CLIENT_ID,
                                       host='127.0.0.1',
                                       port=8087,
-                                      transport = transport.PBCTransport)
+                                      transport=transport.PBCTransport)
         # self.client.debug = 0
         # self.client.get_transport().debug = 0
         self.bucket_name = BUCKET_PREFIX + self.id().rsplit('.', 1)[-1]
@@ -33,7 +33,6 @@ class Tests_PB(unittest.TestCase, BasicTestsMixin):
     def tearDown(self):
         # shut down pb connection explicitly
         yield self.client.get_transport().quit()
-
 
     @defer.inlineCallbacks
     def test_is_alive(self):

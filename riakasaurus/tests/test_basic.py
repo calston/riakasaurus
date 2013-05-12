@@ -29,7 +29,10 @@ class BasicTestsMixin(object):
 
     @defer.inlineCallbacks
     def test_head(self):
-        """create a object, and retrieve metadata via head(), no content is loaded"""
+        """
+            create a object, and retrieve metadata via head(), no content
+            is loaded
+        """
         log.msg("*** head")
 
         obj = self.bucket.new("foo1", "test1")
@@ -123,7 +126,8 @@ class Tests_HTTP(unittest.TestCase, BasicTestsMixin):
         except Exception, e:
             if 'not supported' in str(e):
                 log.msg('skip reset_bucket_properties')
-                raise unittest.SkipTest('bucket.reset_properties() not supported')
+                raise unittest.SkipTest(
+                    'bucket.reset_properties() not supported')
             raise
         # Get default n_val...
         default_n_val = yield self.bucket.get_n_val()
@@ -141,7 +145,8 @@ class Tests_HTTP(unittest.TestCase, BasicTestsMixin):
     def test_reset_bucket_properties_not_available(self):
         """manipulate bucket properties"""
         log.msg('*** reset_bucket_properties_not_available')
-        self.patch(self.client.transport, 'server_version', lambda: StrictVersion('1.2.0'))
+        self.patch(self.client.transport, 'server_version',
+            lambda: StrictVersion('1.2.0'))
         try:
             # Test resetting bucket properties...
             yield self.bucket.reset_properties()
@@ -173,4 +178,3 @@ class Tests_HTTP(unittest.TestCase, BasicTestsMixin):
 
         self.client.setRequestTimeout(None)
         log.msg('done timeout')
-

@@ -21,7 +21,6 @@ from riakasaurus import riak
 
 RIAK_CLIENT_ID = 'TEST'
 BUCKET_PREFIX = 'riakasaurus.tests.'
-
 JAVASCRIPT_SUM = """
 function(v) {
   x = v.reduce(function(a,b){ return a + b }, 0);
@@ -61,7 +60,7 @@ class Tests(unittest.TestCase):
         """Get an object that does not exist, then set_data and save it """
         log.msg("*** set_data_empty")
 
-        obj = yield self.bucket.get("foo1") 
+        obj = yield self.bucket.get("foo1")
 
         self.assertEqual(obj.exists(), False)
         self.assertEqual(obj.get_data(), None)
@@ -69,7 +68,6 @@ class Tests(unittest.TestCase):
         obj.set_data('bar1')
         yield obj.store()
 
-        
         self.assertEqual(obj.exists(), True)
         self.assertEqual(obj.get_data(), "bar1")
         log.msg("done set_data_empty")
@@ -348,5 +346,3 @@ class Tests(unittest.TestCase):
         self.assertTrue(mk1_lc in metas)
         self.assertTrue(metas[mk1_lc] == meta_data)
         log.msg('done meta_data_simple')
-
-

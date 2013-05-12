@@ -1,7 +1,4 @@
-"""
-.. module:: riak.py
-
-"""
+"""Mostly a compatibility module"""
 
 from riakasaurus import riak_object, mapreduce, bucket, client
 

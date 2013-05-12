@@ -175,5 +175,3 @@ class Tests(unittest.TestCase):
         result = yield job.run()
         self.assertEqual(result, [10])
         log.msg('done javascript_arg_map_reduce')
-
-

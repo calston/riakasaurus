@@ -18,22 +18,25 @@ class ITransport(Interface):
         list keys for a given bucket
         """
 
-    def put(self, robj, w = None, dw = None, pw = None, return_body = True, if_none_match=False):
+    def put(self, robj, w=None, dw=None, pw=None, return_body=True,
+            if_none_match=False):
         """
         store a riak_object
         """
 
-    def put_new(self, robj, w=None, dw=None, pw=None, return_body=True, if_none_match=False):
+    def put_new(self, robj, w=None, dw=None, pw=None, return_body=True,
+                if_none_match=False):
         """
         store a riak_object and generate a key for it
         """
 
-    def get(self, robj, r = None, pr = None, vtag = None):
+    def get(self, robj, r=None, pr=None, vtag=None):
         """
         fetch a key from the server
         """
 
-    def delete(self, robj, rw=None, r = None, w = None, dw = None, pr = None, pw = None):
+    def delete(self, robj, rw=None, r=None, w=None, dw=None, pr=None,
+               pw=None):
         """
         delete a key from the bucket
         """
@@ -164,4 +167,3 @@ class FeatureDetection(object):
             self._s_version = yield self._server_version()
 
         defer.returnValue(StrictVersion(self._s_version))
-

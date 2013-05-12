@@ -24,8 +24,8 @@ class RiakClient(object):
     """
     def __init__(self, host='127.0.0.1', port=8098,
                 prefix='riak', mapred_prefix='mapred',
-                client_id=None, r_value="default", w_value="default", dw_value="default",
-                transport=transport.HTTPTransport,
+                client_id=None, r_value="default", w_value="default",
+                dw_value="default", transport=transport.HTTPTransport,
                 request_timeout=None):
         """
         Construct a new RiakClient object.
@@ -83,8 +83,8 @@ class RiakClient(object):
 
     def set_rw(self, rw):
         """
-        Set the RW-value for this ``RiakClient`` instance. See :func:`set_r` for a
-        description of how these values are used.
+        Set the RW-value for this ``RiakClient`` instance. See :func:`set_r`
+        for a description of how these values are used.
 
         :param rw: The RW value.
         :type rw: integer
@@ -103,8 +103,8 @@ class RiakClient(object):
 
     def set_pw(self, pw):
         """
-        Set the PW-value for this ``RiakClient`` instance. See :func:`set_r` for a
-        description of how these values are used.
+        Set the PW-value for this ``RiakClient`` instance. See :func:`set_r`
+        for a description of how these values are used.
 
         :param pw: The W value.
         :type pw: integer
@@ -123,8 +123,8 @@ class RiakClient(object):
 
     def set_pr(self, pr):
         """
-        Set the PR-value for this ``RiakClient`` instance. See :func:`set_r` for a
-        description of how these values are used.
+        Set the PR-value for this ``RiakClient`` instance. See :func:`set_r`
+        for a description of how these values are used.
 
         :param pr: The PR value.
         :type pr: integer

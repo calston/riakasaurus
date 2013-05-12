@@ -74,4 +74,3 @@ class RiakSearch(object):
         return self._client.transport.search(index, query, **params)
 
     select = search
-

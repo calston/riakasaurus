@@ -29,10 +29,12 @@ function(v) {
 }
 """
 
+
 def sleep(secs):
     d = defer.Deferred()
     reactor.callLater(secs, d.callback, None)
     return d
+
 
 def randint():
     """Generate nice random int for our test."""
@@ -167,4 +169,3 @@ class Tests(unittest.TestCase):
                                                   " username:dizzy")
         # This test fails at eventual consistency...
         #self.assertEquals(0, len(results["docs"]))
-

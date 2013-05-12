@@ -23,6 +23,7 @@ from riakasaurus.riak_object import RiakObject
 
 import mimetypes
 
+
 class RiakBucket(object):
     """
     The ``RiakBucket`` object allows you to access and change information
@@ -189,7 +190,6 @@ class RiakBucket(object):
         self._pr = pr
         return self
 
-
     def get_pw(self, pw=None):
         """
         Get the PW-value for this bucket, if it is set, otherwise return
@@ -217,7 +217,8 @@ class RiakBucket(object):
 
     def get_encoder(self, content_type):
         """
-        Get the encoding function for the provided content type for this bucket.
+        Get the encoding function for the provided content type for this
+        bucket.
 
         :param content_type: Content type requested
         """
@@ -228,18 +229,20 @@ class RiakBucket(object):
 
     def set_encoder(self, content_type, encoder):
         """
-        Set the encoding function for the provided content type for this bucket.
+        Set the encoding function for the provided content type for this
+        bucket.
 
         :param content_type: Content type for encoder
-        :param encoder: Function to encode with - will be called with data as single
-                        argument.
+        :param encoder: Function to encode with - will be called with data as
+                        single argument.
         """
         self._encoders[content_type] = encoder
         return self
 
     def get_decoder(self, content_type):
         """
-        Get the decoding function for the provided content type for this bucket.
+        Get the decoding function for the provided content type for this
+        bucket.
 
         :param content_type: Content type for decoder
         """
@@ -250,7 +253,8 @@ class RiakBucket(object):
 
     def set_decoder(self, content_type, decoder):
         """
-        Set the decoding function for the provided content type for this bucket.
+        Set the decoding function for the provided content type for this
+        bucket.
 
         :param content_type: Content type for decoder
         :param decoder: Function to decode with - will be called with string
@@ -260,10 +264,12 @@ class RiakBucket(object):
 
     def new(self, key=None, data=None, content_type='application/json'):
         """
-        Create a new :class:`RiakObject <riak.riak_object.RiakObject>` that will be stored as JSON. A shortcut for
-        manually instantiating a :class:`RiakObject <riak.riak_object.RiakObject>`.
+        Create a new :class:`RiakObject <riak.riak_object.RiakObject>` that
+        will be stored as JSON. A shortcut for manually instantiating a
+        :class:`RiakObject <riak.riak_object.RiakObject>`.
 
-        :param key: Name of the key. Leaving this to be None (default) will make Riak generate the key on store.
+        :param key: Name of the key. Leaving this to be None (default) will
+                    make Riak generate the key on store.
         :type key: string
         :param data: The data to store.
         :type data: object
@@ -283,8 +289,10 @@ class RiakBucket(object):
 
     def new_binary(self, key, data, content_type='application/octet-stream'):
         """
-        Create a new :class:`RiakObject <riak.riak_object.RiakObject>` that will be stored as plain text/binary.
-        A shortcut for manually instantiating a :class:`RiakObject <riak.riak_object.RiakObject>`.
+        Create a new :class:`RiakObject <riak.riak_object.RiakObject>` that
+        will be stored as plain text/binary.
+        A shortcut for manually instantiating a
+        :class:`RiakObject <riak.riak_object.RiakObject>`.
 
         :param key: Name of the key.
         :type key: string
@@ -335,7 +343,7 @@ class RiakBucket(object):
         r = self.get_r(r)
         pr = self.get_pr(pr)
         return obj.head(r=r, pr=pr)
-    
+
     def get_binary(self, key, r=None, pr=None):
         """
         Retrieve a binary/string object from Riak.
@@ -410,8 +418,8 @@ class RiakBucket(object):
 
         .. warning::
 
-           This should only be used if you know what you are doing, as it can lead to
-           unexpected results.
+           This should only be used if you know what you are doing, as it can
+           lead to unexpected results.
 
         :param bool: True to store and return conflicting writes.
         :type bool: boolean
@@ -439,12 +447,13 @@ class RiakBucket(object):
         :param value: Property value.
         :type value: mixed
         """
-        return self.set_properties({key : value})
-    
+        return self.set_properties({key: value})
+
     @defer.inlineCallbacks
     def get_bool_property(self, key):
         """
-        Get a boolean bucket property.  Converts to a ``True`` or ``False`` value.
+        Get a boolean bucket property.  Converts to a ``True`` or ``False``
+        value.
 
         :param key: Property to set.
         :type key: string
@@ -511,7 +520,8 @@ class RiakBucket(object):
 
     def new_binary_from_file(self, key, filename):
         """
-        Create a new Riak object in the bucket, using the content of the specified file.
+        Create a new Riak object in the bucket, using the content of the
+        specified file.
         """
         binary_data = open(filename, "rb").read()
         mimetype, encoding = mimetypes.guess_type(filename)
@@ -539,7 +549,7 @@ class RiakBucket(object):
         if self.SEARCH_PRECOMMIT_HOOK not in precommit_hooks:
             yield self.set_properties({"precommit":
                 precommit_hooks + [self.SEARCH_PRECOMMIT_HOOK]})
-        
+
         defer.returnValue(True)
 
     @defer.inlineCallbacks
@@ -566,7 +576,8 @@ class RiakBucket(object):
         """
         Queries a secondary index over objects in this bucket, returning keys.
         """
-        return self._client.transport.get_index(self._name, index, startkey, endkey)
+        return self._client.transport.get_index(
+            self._name, index, startkey, endkey)
 
     def list_keys(self):
         """ Same as get_keys - for txRiak compat """
@@ -593,4 +604,3 @@ class RiakBucket(object):
         for key in keys:
             obj = yield self.get_binary(key)
             yield obj.delete()
-

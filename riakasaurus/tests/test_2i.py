@@ -73,7 +73,7 @@ class Tests(unittest.TestCase):
 
         results = yield self.client.index(self.bucket_name,
                                           'field1_bin', 'val2').run()
-        
+
         r1 = yield results[0].get()
 
         self.assertEqual(r1.get_key(), u'foo2')
@@ -102,4 +102,3 @@ class Tests(unittest.TestCase):
                          ['foo1', 'foo2'])
 
         log.msg("done secondary_index")
-
