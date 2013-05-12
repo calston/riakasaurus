@@ -3,7 +3,7 @@ from zope.interface import implements
 from twisted.protocols.basic import LineReceiver
 LineReceiver.MAX_LENGTH = 1024*1024*64
 
-from twisted.internet import defer, reactor, protocol
+from twisted.internet import defer, reactor, protocol, error
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IBodyProducer
 from twisted.python import log
@@ -25,6 +25,7 @@ from riakasaurus.riak_index_entry import RiakIndexEntry
 from riakasaurus.mapreduce import RiakLink
 
 from riakasaurus.transport import transport
+from riakasaurus import exceptions
 
 MAX_LINK_HEADER_SIZE = 8192 - 8
 
@@ -142,6 +143,12 @@ class HTTPTransport(transport.FeatureDetection):
         else:
             return haveBody(StringIO(""))
 
+    def abort_request(self, agent):
+        """Called to abort request on timeout"""
+        if not agent.called:
+            t = self.client.request_timeout
+            agent.cancel()
+
     def http_request(self, method, path, headers={}, body=None):
         url = "http://%s:%s%s" % (self.host, self.port, path)
 
@@ -152,6 +159,7 @@ class HTTPTransport(transport.FeatureDetection):
             else:
                 h[k.lower()] = v
 
+        # content-type must always be set
         if not 'content-type' in h.keys():
             h['content-type'] = ['application/json']
 
@@ -160,9 +168,30 @@ class HTTPTransport(transport.FeatureDetection):
         else:
             bodyProducer = None
 
-        return Agent(reactor).request(
-                method, str(url), Headers(h), bodyProducer
-            ).addCallback(self.http_response)
+        requestAgent = Agent(reactor).request(
+                method, str(url), Headers(h), bodyProducer)
+
+        if self.client.request_timeout:
+            # Start request timer
+            t = self.client.request_timeout
+            timeout = reactor.callLater(t,
+                self.abort_request, requestAgent)
+
+            def timeoutProxy(request):
+                if timeout.active():
+                    timeout.cancel()
+                return self.http_response(request)
+            
+            def requestAborted(failure):
+                failure.trap(defer.CancelledError, error.ConnectingCancelledError)
+                raise exceptions.RequestTimeout(
+                    "Request took longer than %s seconds" % t)
+
+            requestAgent.addCallback(timeoutProxy).addErrback(requestAborted)
+        else:
+            requestAgent.addCallback(self.http_response)
+
+        return requestAgent
 
     def build_rest_path(self, bucket=None, key=None, params=None, prefix=None) :
         """
