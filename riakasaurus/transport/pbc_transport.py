@@ -27,8 +27,8 @@ LOGLEVEL_TRANSPORT_VERBOSE = 4
 
 
 class StatefulTransport(object):
-    def __init__(self, transport):
-        self.__transport = transport
+    def __init__(self):
+        self.__transport = None
         self.__state = 'idle'
         self.__created = time.time()
         self.__used = time.time()
@@ -50,6 +50,9 @@ class StatefulTransport(object):
     def setIdle(self):
         self.__state = 'idle'
         self.__used = time.time()
+
+    def setTransport(self, transport):
+        self.__transport = transport
 
     def getTransport(self):
         return self.__transport
@@ -99,22 +102,27 @@ class PBCTransport(transport.FeatureDetection):
                         ), logLevel=self.logToLevel)
                 defer.returnValue(stp)
         if not foundOne:
-            if len(self._transports) > self.MAX_TRANSPORTS:
-                raise Exception("to many transports, aborting")
+            if len(self._transports) >= self.MAX_TRANSPORTS:
+                raise Exception("too many transports, aborting")
 
             # nothin free, create a new protocol instance, append
             # it to self._transports and return it
-            transport = yield pbc.RiakPBCClient().connect(self.host, self.port)
-            if self.timeout:
-                transport.setTimeout(self.timeout)
-            stp = StatefulTransport(transport)
+
+            # insert a placeholder into self._transports to avoid race
+            # conditions with the MAX_TRANSPORTS check above.
+            stp = StatefulTransport()
+            stp.setActive()
             idx = len(self._transports)
             self._transports.append(stp)
-            stp.setActive()
+
+            # create the transport and use it to configure the placeholder.
+            transport = yield pbc.RiakPBCClient().connect(self.host, self.port)
+            stp.setTransport(transport)
+            if self.timeout:
+                transport.setTimeout(self.timeout)
             if self.debug & LOGLEVEL_TRANSPORT:
                 log.msg("[%s] allocate new transport[%d]: %s" % (
-                        self.__class__.__name__,
-                        len(self._transports), stp
+                        self.__class__.__name__, idx, stp
                     ), logLevel=self.logToLevel)
             defer.returnValue(stp)
 
@@ -165,7 +173,7 @@ class PBCTransport(transport.FeatureDetection):
                         stp
                     ), logLevel=self.logToLevel)
 
-            yield stp.getTransport().quit()
+            yield (stp.getTransport() and stp.getTransport().quit())
 
     def __del__(self):
         """on shutdown, close all transports"""
