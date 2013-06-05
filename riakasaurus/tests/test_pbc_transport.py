@@ -27,7 +27,7 @@ class Tests(unittest.TestCase):
         yield self.client.get_transport().quit()
 
     @defer.inlineCallbacks
-    def test_put_raises_exception_if_out_of_connections(self):
+    def test_put_raises_exception_if_max_transports_reached(self):
         data = 'My data'
         objs = [self.bucket.new_binary(str(i), data) for i in range(4)]
         ds = map(self.put_new, objs)
@@ -36,6 +36,24 @@ class Tests(unittest.TestCase):
             if not success and self.is_too_many_transports_failure(result_or_failure):
                 return
         assert False, 'Should fail because MAX_TRANSPORTS is 3'
+
+    @defer.inlineCallbacks
+    def test_put_returns_transports_even_if_an_exception_occurs(self):
+        data = 'My data'
+
+        # Cause three TypeErrors deep in pbc_transport, hopefully not breaking the
+        # transports permanently.
+        for i in range(3):
+            try:
+                obj = self.bucket.new_binary(i, data)
+                yield self.put_new(obj)
+            except TypeError:
+                pass
+
+        # Previously we would get a too many transports error, but now
+        # transports should have been recycled properly.
+        obj = self.bucket.new_binary('my_key', data)
+        yield self.put_new(obj)
 
     def put_new(self, obj):
         w = self.bucket.get_w(None)

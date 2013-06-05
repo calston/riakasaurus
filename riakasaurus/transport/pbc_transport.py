@@ -244,13 +244,15 @@ class PBCTransport(transport.FeatureDetection):
         # aquire transport, fire, release
         stp = yield self._getFreeTransport()
         transport = stp.getTransport()
-        ret = yield transport.put(robj.get_bucket().get_name(),
-                                  robj.get_key(),
-                                  payload,
-                                  vclock,
-                                  **kwargs
-                                  )
-        stp.setIdle()
+        try:
+            ret = yield transport.put(robj.get_bucket().get_name(),
+                                      robj.get_key(),
+                                      payload,
+                                      vclock,
+                                      **kwargs
+                                      )
+        finally:
+            stp.setIdle()
         defer.returnValue(self.parseRpbGetResp(ret))
 
     @defer.inlineCallbacks
