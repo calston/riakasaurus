@@ -37,6 +37,12 @@ class StatefulTransport(object):
         return '<StatefulTransport idle=%.2fs state=\'%s\' transport=%s>' % (
             time.time() - self.__used, self.__state, self.__transport)
 
+    def __enter__(self):
+        return self.getTransport()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.setIdle()
+
     def isActive(self):
         return self.__state == 'active'
 
@@ -242,17 +248,13 @@ class PBCTransport(transport.FeatureDetection):
                 )
 
         # aquire transport, fire, release
-        stp = yield self._getFreeTransport()
-        transport = stp.getTransport()
-        try:
+        with (yield self._getFreeTransport()) as transport:
             ret = yield transport.put(robj.get_bucket().get_name(),
                                       robj.get_key(),
                                       payload,
                                       vclock,
                                       **kwargs
                                       )
-        finally:
-            stp.setIdle()
         defer.returnValue(self.parseRpbGetResp(ret))
 
     @defer.inlineCallbacks
@@ -260,27 +262,23 @@ class PBCTransport(transport.FeatureDetection):
 
         # ***FIXME*** whats vtag for? ignored for now
 
-        stp = yield self._getFreeTransport()
-        transport = stp.getTransport()
-        ret = yield transport.get(robj.get_bucket().get_name(),
-                                  robj.get_key(),
-                                  r=r,
-                                  pr=pr)
+        with (yield self._getFreeTransport()) as transport:
+            ret = yield transport.get(robj.get_bucket().get_name(),
+                                      robj.get_key(),
+                                      r=r,
+                                      pr=pr)
 
-        stp.setIdle()
         defer.returnValue(self.parseRpbGetResp(ret))
 
     @defer.inlineCallbacks
     def head(self, robj, r=None, pr=None, vtag=None):
-        stp = yield self._getFreeTransport()
-        transport = stp.getTransport()
-        ret = yield transport.get(robj.get_bucket().get_name(),
-                                  robj.get_key(),
-                                  r=r,
-                                  pr=pr,
-                                  head=True)
+        with (yield self._getFreeTransport()) as transport:
+            ret = yield transport.get(robj.get_bucket().get_name(),
+                                      robj.get_key(),
+                                      r=r,
+                                      pr=pr,
+                                      head=True)
 
-        stp.setIdle()
         defer.returnValue(self.parseRpbGetResp(ret))
 
     @defer.inlineCallbacks
@@ -297,22 +295,18 @@ class PBCTransport(transport.FeatureDetection):
         if ts and robj.vclock() is not None:
             kwargs['vclock'] = robj.vclock()
 
-        stp = yield self._getFreeTransport()
-        transport = stp.getTransport()
-        ret = yield transport.delete(robj.get_bucket().get_name(),
-                                     robj.get_key(),
-                                     **kwargs
-                                     )
+        with (yield self._getFreeTransport()) as transport:
+            ret = yield transport.delete(robj.get_bucket().get_name(),
+                                         robj.get_key(),
+                                         **kwargs
+                                         )
 
-        stp.setIdle()
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
     def get_buckets(self):
-        stp = yield self._getFreeTransport()
-        transport = stp.getTransport()
-        ret = yield transport.getBuckets()
-        stp.setIdle()
+        with (yield self._getFreeTransport()) as transport:
+            ret = yield transport.getBuckets()
         defer.returnValue([x for x in ret.buckets])
 
     @defer.inlineCallbacks
@@ -324,11 +318,8 @@ class PBCTransport(transport.FeatureDetection):
 
     @defer.inlineCallbacks
     def _server_version(self):
-        stp = yield self._getFreeTransport()
-        transport = stp.getTransport()
-
-        stats = yield transport.getServerInfo()
-        stp.setIdle()
+        with (yield self._getFreeTransport()) as transport:
+            stats = yield transport.getServerInfo()
 
         if stats is not None:
             if self.debug % LOGLEVEL_DEBUG:
@@ -345,10 +336,8 @@ class PBCTransport(transport.FeatureDetection):
         """
         Check server is alive
         """
-        stp = yield self._getFreeTransport()
-        transport = stp.getTransport()
-        ret = yield transport.ping()
-        stp.setIdle()
+        with (yield self._getFreeTransport()) as transport:
+            ret = yield transport.ping()
         defer.returnValue(ret == True)
 
     @defer.inlineCallbacks
@@ -356,10 +345,8 @@ class PBCTransport(transport.FeatureDetection):
         """
         Set bucket properties
         """
-        stp = yield self._getFreeTransport()
-        transport = stp.getTransport()
-        ret = yield transport.setBucketProperties(bucket.get_name(), **props)
-        stp.setIdle()
+        with (yield self._getFreeTransport()) as transport:
+            ret = yield transport.setBucketProperties(bucket.get_name(), **props)
         defer.returnValue(ret == True)
 
     @defer.inlineCallbacks
@@ -367,10 +354,8 @@ class PBCTransport(transport.FeatureDetection):
         """
         get bucket properties
         """
-        stp = yield self._getFreeTransport()
-        transport = stp.getTransport()
-        ret = yield transport.getBucketProperties(bucket.get_name())
-        stp.setIdle()
+        with (yield self._getFreeTransport()) as transport:
+            ret = yield transport.getBucketProperties(bucket.get_name())
         defer.returnValue({
             'n_val': ret.props.n_val,
             'allow_mult': ret.props.allow_mult
@@ -378,18 +363,14 @@ class PBCTransport(transport.FeatureDetection):
 
     @defer.inlineCallbacks
     def get_keys(self, bucket):
-        stp = yield self._getFreeTransport()
-        transport = stp.getTransport()
-        ret = yield transport.getKeys(bucket.get_name())
-        stp.setIdle()
+        with (yield self._getFreeTransport()) as transport:
+            ret = yield transport.getKeys(bucket.get_name())
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
     def get_index(self, bucket, index, startkey, endkey=None):
-        stp = yield self._getFreeTransport()
-        transport = stp.getTransport()
-        ret = yield transport.get_index(bucket, index, startkey, endkey=endkey)
-        stp.setIdle()
+        with (yield self._getFreeTransport()) as transport:
+            ret = yield transport.get_index(bucket, index, startkey, endkey=endkey)
         defer.returnValue(ret)
 
     def parseRpbGetResp(self, res):
