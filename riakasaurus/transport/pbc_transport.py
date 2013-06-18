@@ -122,15 +122,20 @@ class PBCTransport(transport.FeatureDetection):
             self._transports.append(stp)
 
             # create the transport and use it to configure the placeholder.
-            transport = yield pbc.RiakPBCClient().connect(self.host, self.port)
-            stp.setTransport(transport)
-            if self.timeout:
-                transport.setTimeout(self.timeout)
-            if self.debug & LOGLEVEL_TRANSPORT:
-                log.msg("[%s] allocate new transport[%d]: %s" % (
-                        self.__class__.__name__, idx, stp
-                    ), logLevel=self.logToLevel)
-            defer.returnValue(stp)
+            try:
+                transport = yield pbc.RiakPBCClient().connect(self.host, self.port)
+                stp.setTransport(transport)
+                if self.timeout:
+                    transport.setTimeout(self.timeout)
+                if self.debug & LOGLEVEL_TRANSPORT:
+                    log.msg("[%s] allocate new transport[%d]: %s" % (
+                            self.__class__.__name__, idx, stp
+                        ), logLevel=self.logToLevel)
+                defer.returnValue(stp)
+            except:
+                self._transports.remove(stp)
+                raise
+
 
     @defer.inlineCallbacks
     def _garbageCollect(self):
