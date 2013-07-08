@@ -132,7 +132,7 @@ class PBCTransport(transport.FeatureDetection):
                             self.__class__.__name__, idx, stp
                         ), logLevel=self.logToLevel)
                 defer.returnValue(stp)
-            except:
+            except Exception:
                 self._transports.remove(stp)
                 raise
 
