@@ -478,6 +478,9 @@ class RiakPBCClientFactory(ClientFactory):
         self.d = Deferred()
         self.connected = Deferred()
 
+    def clientConnectionFailed(self, connector, reason):
+        self.connected.errback(reason)
+
 
 class RiakPBCClient(object):
     def connect(self, host, port):

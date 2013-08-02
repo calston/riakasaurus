@@ -6,6 +6,7 @@ tests for RiakPBCClient, trial
 from twisted.trial import unittest
 from twisted.internet import defer
 from twisted.python import log
+from twisted.internet.error import ConnectionRefusedError
 
 from riakasaurus.transport import pbc
 
@@ -186,3 +187,12 @@ class Test_PBCClient(unittest.TestCase):
         self.assertTrue(len(result.content[0].links) == 2)
 
         log.msg("done testing links")
+
+    @defer.inlineCallbacks
+    def test_connection_refused(self):
+        try:
+            # Connection to a host that does not exist.
+            yield pbc.RiakPBCClient().connect('127.0.0.17', 8087)
+            assert False, 'ConnectionRefusedError not raised as expected.'
+        except ConnectionRefusedError:
+            pass
