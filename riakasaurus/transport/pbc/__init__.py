@@ -147,6 +147,7 @@ class RiakPBC(Int32StringReceiver):
 
     timeout = None
     timeoutd = None
+    disconnected = False
     debug = 0
 
     # ------------------------------------------------------------------
@@ -344,6 +345,9 @@ class RiakPBC(Int32StringReceiver):
         """
         self.factory.connected.callback(self)
 
+    def connectionLost(self, reason):
+        self.disconnected = True
+
     def setTimeout(self, t):
         self.timeout = t
 
@@ -464,6 +468,9 @@ class RiakPBC(Int32StringReceiver):
                 raise exceptions.RiakPBCException('invalid value %s' % (val))
         else:
             return val
+
+    def isDisconnected(self):
+        return self.disconnected
 
     @defer.inlineCallbacks
     def quit(self):

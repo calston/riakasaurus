@@ -66,6 +66,10 @@ class StatefulTransport(object):
     def age(self):
         return time.time() - self.__used
 
+    def isDisconnected(self):
+        transport = self.getTransport()
+        return transport and transport.isDisconnected()
+
 
 class PBCTransport(transport.FeatureDetection):
     """ Protocoll buffer transport for Riak """
@@ -96,6 +100,10 @@ class PBCTransport(transport.FeatureDetection):
     @defer.inlineCallbacks
     def _getFreeTransport(self):
         foundOne = False
+
+        # Discard disconnected transports.
+        self._transports = [x for x in self._transports if not x.isDisconnected()]
+
         for stp in self._transports:
             if stp.isIdle():
                 stp.setActive()
