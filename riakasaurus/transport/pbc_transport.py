@@ -7,7 +7,7 @@ from twisted.internet import defer, reactor, protocol
 from twisted.python import log
 import logging
 
-from distutils.version import StrictVersion
+from distutils.version import LooseVersion
 
 import time
 
@@ -327,7 +327,7 @@ class PBCTransport(transport.FeatureDetection):
         if not self._s_version:
             self._s_version = yield self._server_version()
 
-        defer.returnValue(StrictVersion(self._s_version))
+        defer.returnValue(LooseVersion(self._s_version))
 
     @defer.inlineCallbacks
     def _server_version(self):
