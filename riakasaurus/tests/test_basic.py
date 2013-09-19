@@ -8,7 +8,7 @@ riakasaurus _must_ be on your PYTHONPATH
 from twisted.trial import unittest
 from twisted.python import log
 from twisted.internet import defer
-from distutils.version import StrictVersion
+from distutils.version import LooseVersion
 
 VERBOSE = False
 
@@ -146,7 +146,7 @@ class Tests_HTTP(unittest.TestCase, BasicTestsMixin):
         """manipulate bucket properties"""
         log.msg('*** reset_bucket_properties_not_available')
         self.patch(self.client.transport, 'server_version',
-            lambda: StrictVersion('1.2.0'))
+                   lambda: LooseVersion('1.2.0'))
         try:
             # Test resetting bucket properties...
             yield self.bucket.reset_properties()
