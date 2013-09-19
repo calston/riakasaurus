@@ -17,7 +17,7 @@ from riakasaurus.mapreduce import RiakLink
 from riakasaurus.transport import transport
 from riakasaurus import exceptions
 
-from distutils.version import StrictVersion
+from distutils.version import LooseVersion
 from cStringIO import StringIO
 from xml.etree import ElementTree
 

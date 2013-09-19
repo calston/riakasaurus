@@ -2,13 +2,13 @@ from zope.interface import Interface
 
 from twisted.internet import defer
 
-from distutils.version import StrictVersion
+from distutils.version import LooseVersion
 
 versions = {
-    1: StrictVersion("1.0.0"),
-    1.1: StrictVersion("1.1.0"),
-    1.2: StrictVersion("1.2.0"),
-    1.3: StrictVersion("1.3.0"),
+    1: LooseVersion("1.0.0"),
+    1.1: LooseVersion("1.1.0"),
+    1.2: LooseVersion("1.2.0"),
+    1.3: LooseVersion("1.3.0"),
     }
 
 
@@ -166,4 +166,4 @@ class FeatureDetection(object):
         if not self._s_version:
             self._s_version = yield self._server_version()
 
-        defer.returnValue(StrictVersion(self._s_version))
+        defer.returnValue(LooseVersion(self._s_version))
