@@ -7,7 +7,7 @@ services:
 install: 
   - "pip install -r requirements.pip --use-mirrors"
   - "python setup.py install"
-script: trial riakasaurus
+script: trial riakasaurus.tests
 notifications:
   email:
     - colin.alston@gmail.com
