@@ -1,7 +1,7 @@
 Riakasaurus
 ===========
 
-A Riak client library for Twisted
+The Riak client library for Twisted with a silly name.
 
 |riakasaurus-ci|_
 
@@ -50,15 +50,3 @@ Riakasaurus uses inline deferreds, any operation that requires connecting to Ria
 
     reactor.run()
 
-
-Contributors 
------
-
-Thank you to these people for their previous contributions to txriak and Riakasaurus 
-
- * Simon Cross - Solr search and restructuring many things 
- * Steffen Oschatz (https://github.com/tobixx) - Various patches
- * Jason J. W. Williams 
- * David Novakovic
- * Andreas Pfotenhauer
- * Appropriate Solutions - For the origional txriak work
