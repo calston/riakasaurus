@@ -182,7 +182,8 @@ class PBCTransport(transport.FeatureDetection):
 
     @defer.inlineCallbacks
     def quit(self):
-        self._gc.cancel()      # cancel the garbage collector
+        if not self._gc.cancelled:
+            self._gc.cancel()      # cancel the garbage collector
 
         for stp in self._transports:
             if self.debug & LOGLEVEL_DEBUG:
