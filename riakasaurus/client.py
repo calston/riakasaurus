@@ -245,13 +245,15 @@ class RiakClient(object):
         """
         return bucket.RiakBucket(self, name)
 
-    def is_alive(self):
+    def ping(self):
         """
         Check if the Riak server for this RiakClient is alive.
         :returns: True if alive -- via deferred.
         """
 
         return self.transport.ping()
+
+    is_alive = ping
 
     def add(self, *args):
         """
