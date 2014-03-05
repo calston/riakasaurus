@@ -31,7 +31,6 @@ def buildTestCases(name):
         'self.client.put', 
         'self.client.multiget', 
         'self.client.delete', 
-        'self.client.mapred', 
         'self.client.solr.add',
         'self.client.solr.delete', 
         'self.client.solr.search',
