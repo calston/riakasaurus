@@ -300,6 +300,18 @@ class RiakClient(object):
         mr = mapreduce.RiakMapReduce(self)
         return mr.index(*args)
 
+    def get(self, obj, *args, **kw):
+        """
+        Fetches the content of a Riak object and returns the data
+
+        I think this is a pointless thing to do, but it's part of
+        riak-python-client so who am I to argue
+        """
+        def data(robj):
+            return robj.get_data()
+        
+        return obj.reload().addCallback(data)
+
     def map(self, *args):
         """
         Start assembling a Map/Reduce operation.
@@ -324,6 +336,11 @@ class RiakClient(object):
 
         return self._solr
 
+    def delete(self, obj, rw=None, r=None, w=None, dw=None, pr=None, pw=None):
+        """
+        Delete an object
+        """
+        return obj.delete(rw=rw, r=r, w=w, dw=dw, pr=pr, pw=pw)
 
 if __name__ == "__main__":
     pass
