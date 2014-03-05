@@ -304,13 +304,20 @@ class RiakClient(object):
         """
         Fetches the content of a Riak object and returns the data
 
-        I think this is a pointless thing to do, but it's part of
+        dI think this is a pointless thing to do, but it's part of
         riak-python-client so who am I to argue
         """
         def data(robj):
             return robj.get_data()
         
-        return obj.reload().addCallback(data)
+        return obj.reload(**kw).addCallback(data)
+
+    def put(self, obj, *args, **kw):
+        """
+        Stores an object
+        """
+
+        return obj.store(**kw)
 
     def map(self, *args):
         """
