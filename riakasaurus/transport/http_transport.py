@@ -7,7 +7,6 @@ from twisted.internet import defer, reactor, protocol, error
 from twisted.web.http_headers import Headers
 from twisted.web.client import Agent
 from twisted.web.iweb import IBodyProducer
-from twisted.python import log
 
 # MD_ resources
 from riakasaurus.metadata import *
@@ -17,14 +16,12 @@ from riakasaurus.mapreduce import RiakLink
 from riakasaurus.transport import transport
 from riakasaurus import exceptions
 
-from distutils.version import LooseVersion
 from cStringIO import StringIO
 from xml.etree import ElementTree
 
 import urllib
 import re
 import csv
-import time
 
 MAX_LINK_HEADER_SIZE = 8192 - 8
 
