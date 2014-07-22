@@ -249,7 +249,10 @@ class HTTPTransport(transport.FeatureDetection):
         else:
             raise Exception('Error getting bucket properties.')
 
-        defer.returnValue(props['keys'])
+        # We encode to UTF-8 here, because Riak decodes from UTF-8 to get
+        # unicode for the JSON response.
+        keys = [key.encode('utf-8') for key in props[u'keys']]
+        defer.returnValue(keys)
 
     @defer.inlineCallbacks
     def set_bucket_props(self, bucket, props):
@@ -310,7 +313,7 @@ class HTTPTransport(transport.FeatureDetection):
     def _server_version(self):
         stats = yield self.stats()
         if stats is not None:
-            defer.returnValue(stats['riak_kv_version'])
+            defer.returnValue(stats[u'riak_kv_version'].encode('ascii'))
         # If stats is disabled, we can't assume the Riak version
         # is >= 1.1. However, we can assume the new URL scheme is
         # at least version 1.0
@@ -473,7 +476,10 @@ class HTTPTransport(transport.FeatureDetection):
         else:
             raise Exception('Error getting buckets.')
 
-        defer.returnValue(props['buckets'])
+        # We encode to UTF-8 here, because Riak decodes from UTF-8 to get
+        # unicode for the JSON response.
+        buckets = [key.encode('utf-8') for key in props[u'buckets']]
+        defer.returnValue(buckets)
 
     @defer.inlineCallbacks
     def get_bucket_props(self, bucket):
@@ -489,7 +495,9 @@ class HTTPTransport(transport.FeatureDetection):
         encoded_props = response[1]
         if headers['http_code'] == 200:
             props = self.decodeJson(encoded_props)
-            defer.returnValue(props['props'])
+            byte_key_props = dict(
+                (k.encode('utf-8'), v) for k, v in props[u'props'].items())
+            defer.returnValue(byte_key_props)
         else:
             raise Exception('Error getting bucket properties.')
 
@@ -558,7 +566,10 @@ class HTTPTransport(transport.FeatureDetection):
         self.check_http_code(response, [200])
         jsonData = self.decodeJson(data)
 
-        defer.returnValue(jsonData[u'keys'][:])
+        # We encode to UTF-8 here, because Riak decodes from UTF-8 to get
+        # unicode for the JSON response.
+        keys = [key.encode('utf-8') for key in jsonData[u'keys']]
+        defer.returnValue(keys)
 
     @defer.inlineCallbacks
     def search(self, index, query, **params):
