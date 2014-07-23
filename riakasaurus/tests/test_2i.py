@@ -76,7 +76,7 @@ class Tests(unittest.TestCase):
 
         r1 = yield results[0].get()
 
-        self.assertEqual(r1.get_key(), u'foo2')
+        self.assertEqual(r1.get_key(), 'foo2')
 
         log.msg("done secondary_index")
 
@@ -95,10 +95,32 @@ class Tests(unittest.TestCase):
         obj.add_index('field2_int', 1003)
         yield obj.store()
 
-        results = yield self.bucket.get_index('field2_int', 1,
-                                          2000)
+        results = yield self.bucket.get_index('field2_int', 1, 2000)
 
         self.assertEqual(sorted(results),
                          ['foo1', 'foo2'])
+
+        log.msg("done secondary_index")
+
+    @defer.inlineCallbacks
+    def test_non_ascii_keys(self):
+        log.msg("*** secondary_index")
+        yield self.bucket.enable_search()
+
+        obj = self.bucket.new('foo1', {'field1': 'val1', 'field2': 1001})
+        obj.add_index('field1_bin', 'val1')
+        obj.add_index('field2_int', 1001)
+        yield obj.store()
+
+        obj = self.bucket.new(
+            'foo\xe2\x98\x83', {'field1': 'val2', 'field2': 1003})
+        obj.add_index('field1_bin', 'val2')
+        obj.add_index('field2_int', 1003)
+        yield obj.store()
+
+        results = yield self.bucket.get_index('field2_int', 1, 2000)
+
+        self.assertEqual(sorted(results),
+                         ['foo1', 'foo\xe2\x98\x83'])
 
         log.msg("done secondary_index")

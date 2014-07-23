@@ -80,7 +80,7 @@ class Tests(unittest.TestCase):
 
         v1 = yield keys[0].get()
 
-        self.assertTrue(v1.get_key() == u'foo1')
+        self.assertTrue(v1.get_key() == 'foo1')
 
         yield obj1.delete()
         yield self.bucket.disable_search()
@@ -130,8 +130,8 @@ class Tests(unittest.TestCase):
         results = yield self.client.solr().search(self.bucket_name,
                                                   "username:tony")
 
-        self.assertEquals("tony",
-                          results["docs"][0]["username"])
+        self.assertEquals(u"tony",
+                          results["docs"][0][u"username"])
 
     @defer.inlineCallbacks
     def test_add_multiple_documents_to_index(self):

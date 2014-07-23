@@ -43,7 +43,8 @@ class RiakBucket(object):
         :type name: string
         """
         try:
-            if isinstance(name, basestring):
+            # This allows non-ASCII bytestrings, which should be legal.
+            if isinstance(name, unicode):
                 name = name.encode('ascii')
         except UnicodeError:
             raise TypeError('Unicode bucket names are not supported.')
@@ -276,7 +277,8 @@ class RiakBucket(object):
         :rtype: :class:`RiakObject <riak.riak_object.RiakObject>`
         """
         try:
-            if isinstance(data, basestring):
+            if isinstance(data, unicode):
+                # This is JSON-encoded data, so it should be ASCII.
                 data = data.encode('ascii')
         except UnicodeError:
             raise TypeError('Unicode data values are not supported.')
@@ -474,6 +476,8 @@ class RiakBucket(object):
         :rtype: mixed
         """
         props = yield self.get_properties()
+        if isinstance(key, unicode):
+            key = key.encode('utf-8')
         if (key in props.keys()):
             defer.returnValue(props[key])
         else:
@@ -530,11 +534,27 @@ class RiakBucket(object):
         return self.new_binary(key, binary_data, mimetype)
 
     @defer.inlineCallbacks
+    def _get_precommit_property(self):
+        """
+        Convert these to bytes if necessary.
+        """
+        def to_bytes(thing):
+            if isinstance(thing, unicode):
+                thing = thing.encode('utf-8')
+            return thing
+        pch = yield self.get_property("precommit")
+        hooks = []
+        for hook in pch:
+            hooks.append(
+                dict((to_bytes(k), to_bytes(v)) for k, v in hook.items()))
+        defer.returnValue(hooks)
+
+    @defer.inlineCallbacks
     def search_enabled(self):
         """
         Returns True if the search precommit hook is enabled for this bucket.
         """
-        pch = yield self.get_property("precommit")
+        pch = yield self._get_precommit_property()
         defer.returnValue(self.SEARCH_PRECOMMIT_HOOK in (pch or []))
 
     @defer.inlineCallbacks
@@ -544,7 +564,7 @@ class RiakBucket(object):
         index objects in it.
         Returns deferred
         """
-        pch = yield self.get_property("precommit")
+        pch = yield self._get_precommit_property()
         precommit_hooks = pch or []
         if self.SEARCH_PRECOMMIT_HOOK not in precommit_hooks:
             yield self.set_properties({"precommit":
@@ -558,7 +578,7 @@ class RiakBucket(object):
         Disable search for this bucket by removing the precommit hook to
         index objects in it.
         """
-        pch = yield self.get_property("precommit")
+        pch = yield self._get_precommit_property()
         precommit_hooks = pch or []
         if self.SEARCH_PRECOMMIT_HOOK in precommit_hooks:
             precommit_hooks.remove(self.SEARCH_PRECOMMIT_HOOK)

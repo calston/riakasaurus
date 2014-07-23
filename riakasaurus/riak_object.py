@@ -46,7 +46,8 @@ class RiakObject(object):
         :type key: string
         """
         try:
-            if isinstance(key, basestring):
+            # This allows non-ASCII bytestrings, which should be legal.
+            if isinstance(key, unicode):
                 key = key.encode('ascii')
         except UnicodeError:
             raise TypeError('Unicode keys are not supported.')
